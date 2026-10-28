@@ -1,0 +1,41 @@
+appId: dev.pdfjunkie.reader
+productName: PDF Junkie
+directories:
+  output: dist
+  buildResources: resources
+files:
+  - out/**
+  - package.json
+  - resources/icon.png
+asar: true
+fileAssociations:
+  - ext: pdf
+    name: PDF document
+    mimeType: application/pdf
+    role: Viewer
+win:
+  icon: resources/icon.ico
+  target:
+    - target: nsis
+      arch: [x64]
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+mac:
+  icon: resources/icon.icns
+  category: public.app-category.productivity
+  identity: null
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+linux:
+  syncDesktopName: true
+  icon: resources/icon.png
+  category: Office
+  synopsis: A focused academic PDF reader
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]

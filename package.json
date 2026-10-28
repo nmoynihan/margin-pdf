@@ -1,0 +1,57 @@
+{
+  "name": "pdf-junkie",
+  "productName": "PDF Junkie",
+  "version": "0.1.0",
+  "description": "A focused academic PDF reader with link previews and independent split panes.",
+  "author": {
+    "name": "PDF Junkie contributors",
+    "email": "noreply@pdf-junkie.invalid"
+  },
+  "homepage": "https://pdf-junkie.invalid",
+  "desktopName": "pdf-junkie.desktop",
+  "license": "MIT",
+  "type": "module",
+  "main": "./out/main/index.js",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "postinstall": "node node_modules/electron/install.js",
+    "assets": "node scripts/prepare-assets.mjs",
+    "dev": "npm run assets && electron-vite dev",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write src scripts tests *.ts *.json *.yml .github/workflows/*.yml README.md",
+    "format:check": "prettier --check src scripts tests *.ts *.json *.yml .github/workflows/*.yml README.md",
+    "build": "npm run assets && npm run typecheck && electron-vite build",
+    "test": "vitest run",
+    "test:e2e": "npm run build && node scripts/run-e2e.mjs",
+    "test:packaged": "node scripts/smoke-packaged.mjs",
+    "dist": "npm run build && electron-builder --publish never",
+    "dist:linux": "npm run build && electron-builder --linux --x64 --publish never",
+    "dist:win": "npm run build && electron-builder --win --x64 --publish never",
+    "dist:mac": "npm run build && electron-builder --mac --x64 --arm64 --publish never"
+  },
+  "dependencies": {
+    "lucide-react": "1.63.0",
+    "pdfjs-dist": "6.4.299",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@napi-rs/canvas": "1.0.13",
+    "@playwright/test": "1.64.1",
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "electron": "45.1.0",
+    "electron-builder": "26.18.0",
+    "electron-vite": "6.0.0",
+    "pdf-lib": "1.17.1",
+    "prettier": "3.9.10",
+    "typescript": "7.0.2",
+    "vite": "8.3.5",
+    "vitest": "5.0.5"
+  }
+}

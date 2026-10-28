@@ -1,0 +1,10 @@
+node_modules/
+out/
+dist/
+src/renderer/public/pdfjs/
+src/renderer/public/sample.pdf
+test-results/
+playwright-report/
+tests/fixtures/*.pdf
+*.log
+.DS_Store
