@@ -15,6 +15,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { mkdir, copyFile } from 'node:fs/promises'
 import { ReaderStore } from './store'
 import type { AppCommand } from '../shared/types'
+import { zoomShortcut } from '../shared/shortcuts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const developmentURL = process.env.ELECTRON_RENDERER_URL
@@ -248,6 +249,24 @@ else {
           webSecurity: true,
           spellcheck: false,
         },
+      })
+      window.webContents.on('before-input-event', (event, input) => {
+        if (input.type !== 'keyDown') return
+        const shortcut = zoomShortcut(
+          {
+            key: input.key,
+            code: input.code,
+            ctrlKey: input.control,
+            metaKey: input.meta,
+            altKey: input.alt,
+            isComposing: input.isComposing,
+          },
+          process.platform,
+        )
+        if (!shortcut) return
+        // Consume the key before menu/browser handling so each press zooms the PDF once.
+        event.preventDefault()
+        window?.webContents.send('app-command', shortcut)
       })
       window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
       window.webContents.on('will-navigate', (event) => event.preventDefault())

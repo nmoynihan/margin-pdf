@@ -23,6 +23,7 @@ import {
   type Theme,
 } from '../../shared/types'
 import { sanitizeSession } from '../../shared/session'
+import { zoomShortcut } from '../../shared/shortcuts'
 import { DocumentTab, newTabSnapshot } from './components/DocumentTab'
 import { Brand, IconButton } from './components/Controls'
 
@@ -46,8 +47,8 @@ export default function App() {
   const [dragging, setDragging] = useState(false)
   const [platform, setPlatform] = useState('linux')
   const snapshots = useRef(new Map<string, TabSnapshot>())
-  const current = useRef({ tabs, activeId, theme, sidebar })
-  current.current = { tabs, activeId, theme, sidebar }
+  const current = useRef({ tabs, activeId, theme, sidebar, platform })
+  current.current = { tabs, activeId, theme, sidebar, platform }
   const handlers = useRef(new Map<string, (command: AppCommand) => void>())
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const initialized = useRef(false)
@@ -211,6 +212,12 @@ export default function App() {
         }
       })
     const key = (event: KeyboardEvent) => {
+      const shortcut = zoomShortcut(event, current.current.platform)
+      if (shortcut) {
+        event.preventDefault()
+        commandRef.current(shortcut)
+        return
+      }
       if (event.key === 'Escape') {
         setError('')
         setDragging(false)

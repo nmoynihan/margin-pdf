@@ -161,6 +161,69 @@ test('search, thumbnails, rotation, and returning from a normal link work', asyn
   await expect(page.getByRole('textbox', { name: 'Page number' })).not.toHaveValue('5')
 })
 
+test('Ctrl plus and minus zoom only the active PDF pane, including equals and numpad keys', async () => {
+  await launch('paper.pdf')
+  const source = page.locator('.reader-pane').first()
+  const scale = (pane: typeof source) =>
+    pane
+      .locator('.pdfViewer')
+      .evaluate(
+        (element) =>
+          parseFloat(getComputedStyle(element).getPropertyValue('--scale-factor')) / (4 / 3),
+      )
+  const expectScale = (pane: typeof source, expected: number) =>
+    expect.poll(() => scale(pane)).toBeCloseTo(expected, 5)
+
+  await source.getByRole('combobox', { name: 'Zoom' }).selectOption('1')
+  await expectScale(source, 1)
+  await page.keyboard.press('Control+Equal')
+  await expectScale(source, 1.2)
+  await page.keyboard.press('Control+Shift+Equal')
+  await expectScale(source, 1.44)
+  await page.keyboard.press('Control+Minus')
+  await expectScale(source, 1.2)
+  await page.keyboard.press('Control+NumpadAdd')
+  await expectScale(source, 1.44)
+  await page.keyboard.press('Control+NumpadSubtract')
+  await expectScale(source, 1.2)
+
+  for (const [keyCode, expected] of [
+    ['+', 1.44],
+    ['-', 1.2],
+  ] as const) {
+    await app.evaluate(({ BrowserWindow }, keyCode) => {
+      const window = BrowserWindow.getAllWindows()[0]
+      window.focus()
+      window.webContents.sendInputEvent({ type: 'keyDown', keyCode, modifiers: ['control'] })
+      window.webContents.sendInputEvent({ type: 'keyUp', keyCode, modifiers: ['control'] })
+    }, keyCode)
+    await expectScale(source, expected)
+  }
+
+  if (process.platform === 'darwin') {
+    await page.keyboard.press('Meta+Equal')
+    await expectScale(source, 1.44)
+    await page.keyboard.press('Meta+Minus')
+    await expectScale(source, 1.2)
+  }
+
+  await page.getByRole('button', { name: 'Toggle split view', exact: true }).click()
+  const reference = page.locator('.reader-pane').nth(1)
+  await reference.getByRole('combobox', { name: 'Zoom' }).selectOption('0.75')
+  await reference.locator('.pdf-container').focus()
+  await expect(reference).toHaveClass(/active-pane/)
+  await page.keyboard.press('Control+Equal')
+  await expectScale(reference, 0.9)
+  await expectScale(source, 1.2)
+  await page.keyboard.press('Control+Minus')
+  await expectScale(reference, 0.75)
+  expect(
+    await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()[0].webContents.getZoomFactor(),
+    ),
+  ).toBe(1)
+})
+
 test('PDF text can be selected and copied through the native edit shortcut', async () => {
   await launch('paper.pdf')
   await expect(page.locator('.reader-pane .textLayer span').first()).toBeAttached()

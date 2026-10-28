@@ -51,6 +51,9 @@ On Linux, Electron needs a graphical desktop and the usual Chromium libraries (`
 | Back / forward            | Alt+Left / Alt+Right      | Option+Left / Option+Right |
 | Next / previous tab       | Ctrl+Tab / Ctrl+Shift+Tab | Ctrl+Tab / Ctrl+Shift+Tab  |
 
+Zoom also accepts **Ctrl+=** without Shift and the numeric keypad’s **+ / −** keys.
+On macOS, both **Ctrl** and **Cmd** work for these zoom shortcuts.
+
 ## Build installers
 
 ```sh
