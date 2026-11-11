@@ -20,20 +20,22 @@ Chrome routes documents served as `application/pdf`, including URLs without a `.
 
 Use **Reader settings → Open PDFs in Margin PDF** to disable automatic handling. The **Chrome viewer** button returns the current document to Chrome’s native reader. If several PDF-handler extensions are installed, Chrome selects the most recently installed handler. This build is not tested on other Chromium browsers or Firefox.
 
-The reader uses one compact bar containing the logo, page/zoom controls, the document title in the middle when there is room, and document actions. Click or focus either reading pane to control that pane from the bar. There is no Open PDF button in the toolbar; use the welcome screen, drag-and-drop or Ctrl/Cmd+O for local files. Printing and fullscreen are in **More reader actions**, with download and reload moving there on narrow screens.
+The reader uses one compact bar containing the logo, page/zoom controls, the document title in the middle when there is room, and document actions. Click or focus either reading pane to control that pane from the bar. Local files open from the welcome screen, drag-and-drop or Ctrl/Cmd+O. Printing and fullscreen are in **More reader actions**, with download moving there on narrow screens.
 
 Ctrl/Cmd+Plus (or equals), Minus and the numeric keypad's plus/minus zoom only the active PDF pane, including while a page number or search field has focus. Ctrl/Cmd+0 fits the pane to its width. For full-page PDFs, Chrome's browser zoom controls also zoom the active PDF pane while the toolbar stays at its normal size. Embedded PDFs leave the surrounding web page's browser zoom unchanged.
 
-The reload button reparses the in-memory PDF. Use Chrome’s Reload to obtain a new copy from the source. Desktop file watching and SyncTeX are not available in the extension. PDFs are limited to 128 MiB. Printing prepares pages sequentially using one reusable canvas and compressed image tiles at 150 DPI; it has no page-count or combined raster-area cutoff. The working canvas is bounded to 8,388,608 pixels per tile, and large sheets use multiple tiles.
+Use Chrome’s Reload to obtain a new copy from the source. Desktop file watching and SyncTeX are not available in the extension. PDFs are limited to 128 MiB. Printing prepares pages sequentially using one reusable canvas and compressed image tiles at 150 DPI; it has no page-count or combined raster-area cutoff. The working canvas is bounded to 8,388,608 pixels per tile, and large sheets use multiple tiles.
+
+In **Reader settings → PDF tab titles**, choose whether full-page PDFs retain the website title or use the PDF metadata title. You can restrict this to a domain list (prefilled with `arxiv.org`, including subdomains) or apply it to all HTTP/HTTPS sites. Click **Apply title settings** and grant Chrome's site-access request. The option starts off. Embedded PDFs preserve the host page's title. Settings also link to the GitHub repository.
 
 ## Privacy and packaging
 
-Only `storage` permission is requested. No site-access permissions, network interception, content scripts, telemetry, remote code, or external services. Reading positions are opt-in, stored locally by content fingerprint, capped at 100, and can be cleared. The privacy policy is bundled at `privacy.html` and accessible from the reader.
+The required permissions are `storage` for preferences and optional reading positions, and `scripting` for the opt-in tab-title feature. Site access is optional and requested only when applying title rules. PDF reading needs no site access. No network interception, persistent content scripts, telemetry, remote code or external services are used. Reading positions are stored locally by content fingerprint, capped at 100, and can be cleared. The privacy policy is bundled at `privacy.html` and accessible from the reader.
 
 `npm run dist:chrome` builds a ZIP with `manifest.json` at its root:
 
 ```text
-dist/margin-pdf-chrome-0.1.0.zip
+dist/margin-pdf-chrome-0.2.0.zip
 ```
 
 Upload this ZIP to the Chrome Web Store developer dashboard. See [STORE_LISTING.md](STORE_LISTING.md) for listing copy, permission justification, screenshots, and remaining account/hosting steps. Store approval is determined by Google; building the package does not publish it.

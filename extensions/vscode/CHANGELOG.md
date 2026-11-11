@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0 — 2026-11-11
+
+- Combined document and pane controls in one toolbar, without a PDF title or pane names.
+- Right-aligned search bars use at most half the pane width.
+- Disk-update messages appear in the toolbar with a dismiss button and disappear after 15 seconds.
+
 ## 0.1.0 — 2026-11-11
 
 - Initial Margin PDF custom editor for local desktop VS Code.

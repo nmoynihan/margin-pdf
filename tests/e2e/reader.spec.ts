@@ -72,7 +72,7 @@ test('welcome screen opens the bundled sample offline', async () => {
   await page.screenshot({ path: 'test-results/welcome.png' })
   await page.getByRole('button', { name: 'Open sample PDF' }).click()
   await expect(page.locator('.reader-pane canvas').first()).toBeVisible()
-  await expect(page.locator('.document-title')).toHaveText('Reading without losing the thread')
+  await expect(page.locator('.document-title')).toHaveText('Sample paper on PDF navigation')
   await expect(page.locator('.outline-entry').first()).toContainText('Introduction')
   await expect
     .poll(() =>
@@ -339,7 +339,7 @@ test('OS file URLs with escaped spaces open as native PDF paths', async () => {
   const filename = join(directory, 'paper with spaces.pdf')
   await copyFile(resolve('tests/fixtures/paper.pdf'), filename)
   await launch(filename, undefined, true)
-  await expect(page.locator('.document-title')).toHaveText('Reading without losing the thread')
+  await expect(page.locator('.document-title')).toHaveText('Sample paper on PDF navigation')
 })
 
 test('long PDFs render lazily and accept distant page navigation', async () => {
@@ -400,7 +400,7 @@ test('multiple tabs retain their views, duplicate opens focus a tab, and closed 
   await expect(page.locator('.tab-panel:not([hidden]) .document-title')).toHaveText(
     'Scanned document fixture',
   )
-  await page.getByRole('tab', { name: 'Reading without losing the thread' }).click()
+  await page.getByRole('tab', { name: 'Sample paper on PDF navigation' }).click()
   await expect(
     page.locator('.tab-panel:not([hidden])').getByRole('textbox', { name: 'Page number' }),
   ).toHaveValue('3')
@@ -408,9 +408,10 @@ test('multiple tabs retain their views, duplicate opens focus a tab, and closed 
   // The tab count is already two, so it cannot signal completion of that request.
   await page.getByRole('tab', { name: 'Scanned document fixture' }).click()
   await chooseFile('paper.pdf')
-  await expect(
-    page.getByRole('tab', { name: 'Reading without losing the thread' }),
-  ).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('tab', { name: 'Sample paper on PDF navigation' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
   await expect(page.getByRole('tab')).toHaveCount(2)
   await page.getByRole('button', { name: 'Close paper.pdf', exact: true }).click()
   await expect(page.getByRole('tab')).toHaveCount(1)
@@ -864,9 +865,10 @@ test('native tab switching cannot mix print jobs and the generated PDF contains 
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [filename] })
   }, resolve('tests/fixtures/paper.pdf'))
   await page.locator('.open-button').click()
-  await expect(
-    page.getByRole('tab', { name: 'Reading without losing the thread' }),
-  ).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('tab', { name: 'Sample paper on PDF navigation' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
   await expect(page.locator('.tab-panel:not([hidden]) canvas').first()).toBeVisible()
   await page.getByRole('tab', { name: 'Scanned document fixture' }).click()
   await page.evaluate(() => {
@@ -911,9 +913,10 @@ test('native tab switching cannot mix print jobs and the generated PDF contains 
       .submenu!.items.find((item) => item.label === 'Next tab')!
       .click()
   })
-  await expect(
-    page.getByRole('tab', { name: 'Reading without losing the thread' }),
-  ).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('tab', { name: 'Sample paper on PDF navigation' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  )
   await expect(page.getByRole('dialog', { name: 'Prepare printing' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Print paper', exact: true })).toBeDisabled()
   await app.evaluate(({ Menu }) => {
@@ -1004,6 +1007,15 @@ test('controls remain inside usable panes at minimum window size across layout, 
       if (!sidebar) await page.getByRole('button', { name: 'Toggle sidebar' }).click()
       for (const search of [false, true]) {
         if (search) await page.getByRole('button', { name: 'Find in paper', exact: true }).click()
+        await expect(page.locator('.pane-label')).toHaveCount(0)
+        if (search) {
+          for (const pane of await page.locator('.reader-pane').all()) {
+            const box = await pane.boundingBox()
+            const find = await pane.locator('.find-bar').boundingBox()
+            expect(find!.width).toBeLessThanOrEqual(box!.width / 2 + 1)
+            expect(Math.abs(find!.x + find!.width - box!.x - box!.width)).toBeLessThanOrEqual(1)
+          }
+        }
         for (const ratio of [20, 50, 80]) {
           const divider = page.getByRole('separator', { name: 'Resize panes' })
           await divider.focus()

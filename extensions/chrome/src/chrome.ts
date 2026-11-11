@@ -21,7 +21,29 @@ interface ZoomChange {
 }
 
 interface ChromeAPI {
-  runtime: { getURL(path: string): string }
+  runtime: {
+    getURL(path: string): string
+    sendMessage(message: unknown): Promise<unknown>
+    onMessage: {
+      addListener(
+        callback: (
+          message: unknown,
+          sender: { url?: string; tab?: { id?: number } },
+        ) => Promise<unknown> | undefined,
+      ): void
+    }
+  }
+  permissions: {
+    request(permissions: { origins: string[] }): Promise<boolean>
+    contains(permissions: { origins: string[] }): Promise<boolean>
+  }
+  scripting: {
+    executeScript(options: {
+      target: { tabId: number; frameIds: number[] }
+      func: (title: string | null, originalUrl: string) => boolean
+      args: [string | null, string]
+    }): Promise<Array<{ result?: boolean }>>
+  }
   action: { onClicked: { addListener(callback: () => void): void } }
   tabs: {
     create(options: { url: string }): Promise<unknown>
@@ -34,6 +56,10 @@ interface ChromeAPI {
     }
   }
   storage: {
+    onChanged: {
+      addListener(callback: (changes: Record<string, unknown>, area: string) => void): void
+      removeListener(callback: (changes: Record<string, unknown>, area: string) => void): void
+    }
     local: {
       get(keys?: string | string[] | null): Promise<Record<string, unknown>>
       set(values: Record<string, unknown>): Promise<void>

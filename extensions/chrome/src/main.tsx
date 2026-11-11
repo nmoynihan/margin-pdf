@@ -29,6 +29,7 @@ import {
 } from './storage'
 import { Settings } from './Settings'
 import { bindPdfZoom } from './zoom'
+import { shouldUsePdfTitle } from './title-rules'
 import 'pdfjs-dist/web/pdf_viewer.css'
 import '../../../src/renderer/src/styles.css'
 import '../../../src/renderer/src/skins.css'
@@ -63,6 +64,7 @@ function openNative(): Promise<BrowserDocument> {
 
 function Reader() {
   const [source, setSource] = useState<BrowserDocument>()
+  const [pdfTitle, setPdfTitle] = useState('')
   const [opening, setOpening] = useState(nativePage)
   const [preferences, setPreferences] = useState(defaultPreferences)
   const [ready, setReady] = useState(false)
@@ -120,6 +122,15 @@ function Reader() {
 
   useEffect(() => {
     let alive = true
+    const changed = (changes: Record<string, unknown>, area: string) => {
+      if (area === 'local' && changes.preferences)
+        void readPreferences()
+          .then((value) => {
+            if (alive) setPreferences(value)
+          })
+          .catch((reason) => setError(reason.message))
+    }
+    chromeAPI.storage.onChanged.addListener(changed)
     void (async () => {
       try {
         const prefs = await readPreferences()
@@ -138,10 +149,40 @@ function Reader() {
     })()
     return () => {
       alive = false
+      chromeAPI.storage.onChanged.removeListener(changed)
       clearTimeout(saveTimer.current)
       job.current?.abort()
     }
   }, [adopt])
+
+  useEffect(() => {
+    if (!pdfTitle || !source) return
+    document.title = `${pdfTitle} — Margin PDF`
+    if (!nativePage) return
+    let alive = true
+    void chromeAPI
+      .mimeHandler!.getStreamInfo()
+      .then(async (stream) => {
+        if (!alive || stream.embedded) return
+        await chromeAPI.runtime.sendMessage({
+          type: 'pdf-tab-title',
+          originalUrl: stream.originalUrl,
+          title: shouldUsePdfTitle(
+            stream.originalUrl,
+            preferences.titleMode,
+            preferences.titleDomains,
+          )
+            ? pdfTitle
+            : null,
+        })
+      })
+      .catch((reason) => {
+        if (alive) setError(reason.message)
+      })
+    return () => {
+      alive = false
+    }
+  }, [pdfTitle, source, preferences.titleMode, preferences.titleDomains])
 
   useEffect(() => {
     const media = matchMedia('(prefers-color-scheme: dark)')
@@ -383,9 +424,7 @@ function Reader() {
               sidebarPosition="overlay"
               onSidebar={setSidebar}
               onSnapshot={persist}
-              onTitle={(title) => {
-                document.title = `${title} — Margin PDF`
-              }}
+              onTitle={setPdfTitle}
               onCommandHandler={register}
               onZoomHandler={registerZoom}
               onError={setError}
@@ -395,7 +434,7 @@ function Reader() {
               }}
               onPrint={(loaded) => void print(loaded)}
               printing={!!progress}
-              reloadLabel="Reload PDF"
+              showReload={false}
             />
           </ErrorBoundary>
         ) : opening ? (
@@ -405,16 +444,8 @@ function Reader() {
         ) : (
           <div className="browser-welcome">
             <Brand />
-            <h1>
-              Keep your place.
-              <br />
-              Follow the idea.
-            </h1>
-            <p>
-              Preview a reference. Read two pages side by side.
-              <br />
-              Stay with the paper, wherever it takes you.
-            </p>
+            <h1>Margin PDF</h1>
+            <p>A reader built for papers.</p>
             {nativePage ? (
               <>
                 <p role="alert">{error || 'Chrome could not open this PDF in Margin PDF.'}</p>
@@ -438,11 +469,7 @@ function Reader() {
                 >
                   Open sample PDF
                 </button>
-                <p className="browser-hint">
-                  Drop a PDF here, or open a PDF link in Chrome.
-                  <br />
-                  Your documents stay on your device.
-                </p>
+                <p className="browser-hint">Drop a PDF here, or open a PDF link in Chrome.</p>
               </>
             )}
           </div>

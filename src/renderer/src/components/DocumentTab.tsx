@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Check,
   Ellipsis,
+  X,
 } from 'lucide-react'
 import { readerHost } from '../host'
 import type { SyncTarget } from '../../../shared/reader-host'
@@ -68,6 +69,8 @@ export function DocumentTab({
   reloadLabel = 'Reload PDF from disk',
   toolbarTarget,
   paneToolbarTarget,
+  statusTarget,
+  showReload = true,
 }: {
   compact?: boolean
   secondaryActions?: ReactNode
@@ -75,6 +78,8 @@ export function DocumentTab({
   reloadLabel?: string
   toolbarTarget?: HTMLElement | null
   paneToolbarTarget?: HTMLElement | null
+  statusTarget?: HTMLElement | null
+  showReload?: boolean
   descriptor: DocumentDescriptor
   initial: TabSnapshot
   active: boolean
@@ -106,6 +111,11 @@ export function DocumentTab({
   const [reloading, setReloading] = useState(false)
   const [updateError, setUpdateError] = useState('')
   const [updated, setUpdated] = useState(false)
+  useEffect(() => {
+    if (!updated || statusTarget === undefined) return
+    const timer = setTimeout(() => setUpdated(false), 15_000)
+    return () => clearTimeout(timer)
+  }, [updated, loaded, statusTarget])
   const liveResource = useRef<LoadedDocument | null>(null)
   const retiredResources = useRef<LoadedDocument[]>([])
   const requested = useRef('')
@@ -529,12 +539,14 @@ export function DocumentTab({
         </span>
       </div>
       <div className="document-actions">
-        <IconButton
-          icon={RefreshCw}
-          label={reloadLabel}
-          disabled={printing || reloading}
-          onClick={() => setAttempt((value) => value + 1)}
-        />
+        {showReload && (
+          <IconButton
+            icon={RefreshCw}
+            label={reloadLabel}
+            disabled={printing || reloading}
+            onClick={() => setAttempt((value) => value + 1)}
+          />
+        )}
         <IconButton
           icon={Search}
           label="Find in paper"
@@ -586,13 +598,15 @@ export function DocumentTab({
             </summary>
             <div className="reader-overflow-content">
               {secondaryActions}
-              <button
-                className="overflow-reload"
-                disabled={printing || reloading}
-                onClick={() => setAttempt((value) => value + 1)}
-              >
-                {reloadLabel}
-              </button>
+              {showReload && (
+                <button
+                  className="overflow-reload"
+                  disabled={printing || reloading}
+                  onClick={() => setAttempt((value) => value + 1)}
+                >
+                  {reloadLabel}
+                </button>
+              )}
               {readerHost().toggleFullscreen && (
                 <button onClick={() => void readerHost().toggleFullscreen?.()}>
                   Toggle fullscreen
@@ -626,6 +640,56 @@ export function DocumentTab({
     </div>
   )
 
+  const statusMessage =
+    fileError ||
+    (updateError
+      ? `Keeping the current PDF. ${updateError}`
+      : password
+        ? 'The updated PDF needs a password.'
+        : reloading
+          ? 'Updating from disk…'
+          : 'Updated from disk.')
+  const status = loaded && (fileError || updateError || reloading || updated || password) && (
+    <div
+      className={`file-update-banner${fileError || updateError ? ' has-warning' : ''}`}
+      role="status"
+    >
+      {reloading ? <RefreshCw size={13} className="is-spinning" /> : <Check size={13} />}
+      <span title={statusMessage}>{statusMessage}</span>
+      {password && (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            password.submit(passwordInput)
+            setPasswordInput('')
+            setPassword(null)
+          }}
+        >
+          <input
+            type="password"
+            aria-label="Updated PDF password"
+            value={passwordInput}
+            onChange={(event) => setPasswordInput(event.target.value)}
+          />
+          <button type="submit">Unlock updated PDF</button>
+        </form>
+      )}
+      {(fileError || updateError) && (
+        <button disabled={printing || reloading} onClick={() => setAttempt((value) => value + 1)}>
+          Retry
+        </button>
+      )}
+      {updated &&
+        !fileError &&
+        !updateError &&
+        !reloading &&
+        !password &&
+        statusTarget !== undefined && (
+          <IconButton icon={X} label="Dismiss update message" onClick={() => setUpdated(false)} />
+        )}
+    </div>
+  )
+
   return (
     <div
       className={`document-tab${compact ? ' compact-document' : ''}`}
@@ -635,50 +699,7 @@ export function DocumentTab({
       {toolbarTarget === undefined
         ? toolbar
         : toolbarTarget && createPortal(toolbar, toolbarTarget)}
-      {loaded && (fileError || updateError || reloading || updated || password) && (
-        <div
-          className={`file-update-banner${fileError || updateError ? ' has-warning' : ''}`}
-          role="status"
-        >
-          {reloading ? <RefreshCw size={13} className="is-spinning" /> : <Check size={13} />}
-          <span>
-            {fileError ||
-              (updateError
-                ? `Keeping the current PDF. ${updateError}`
-                : password
-                  ? 'The updated PDF needs a password.'
-                  : reloading
-                    ? 'Updating from disk…'
-                    : 'Updated from disk. Your place is saved.')}
-          </span>
-          {password && (
-            <form
-              onSubmit={(event) => {
-                event.preventDefault()
-                password.submit(passwordInput)
-                setPasswordInput('')
-                setPassword(null)
-              }}
-            >
-              <input
-                type="password"
-                aria-label="Updated PDF password"
-                value={passwordInput}
-                onChange={(event) => setPasswordInput(event.target.value)}
-              />
-              <button type="submit">Unlock updated PDF</button>
-            </form>
-          )}
-          {(fileError || updateError) && (
-            <button
-              disabled={printing || reloading}
-              onClick={() => setAttempt((value) => value + 1)}
-            >
-              Retry
-            </button>
-          )}
-        </div>
-      )}
+      {statusTarget === undefined ? status : statusTarget && createPortal(status, statusTarget)}
       {!loaded ? (
         <div className="document-state">
           {error ? (
@@ -807,7 +828,6 @@ export function DocumentTab({
                     active={pane.id === snapshot.activePaneId}
                     split={snapshot.panes.length === 2}
                     toolbarTarget={paneToolbarTarget}
-                    paneLabel={paneToolbarTarget !== undefined ? `Pane ${index + 1}` : undefined}
                     findOpen={findOpen}
                     onCloseFind={() => setFindOpen(false)}
                     onFocus={() => focus(pane.id)}

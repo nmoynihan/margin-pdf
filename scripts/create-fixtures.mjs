@@ -6,7 +6,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 await mkdir('tests/fixtures', { recursive: true })
 await mkdir('src/renderer/public', { recursive: true })
 const pdf = await PDFDocument.create()
-pdf.setTitle('Reading without losing the thread')
+pdf.setTitle('Sample paper on PDF navigation')
 pdf.setAuthor('Margin PDF • Sample paper')
 pdf.setSubject(
   'An interactive sample document, with fictional references, for testing PDF navigation.',
@@ -71,14 +71,14 @@ for (const [index, page] of pages.entries()) {
   text(page, String(index + 1), 530, 37, 9, sans, muted)
 }
 const intro = pages[0]
-text(intro, 'Reading without losing', 55, 725, 27, bold)
-text(intro, 'the thread', 55, 691, 27, bold)
-text(intro, 'A small study in following references', 55, 660, 13, italic, muted)
+text(intro, 'Sample paper', 55, 725, 27, bold)
+text(intro, 'PDF navigation', 55, 691, 27, bold)
+text(intro, 'Demonstration document', 55, 660, 13, italic, muted)
 text(intro, 'Margin PDF   |   Reader experience notes   |   2026', 55, 631, 9, sans, muted)
 heading(intro, 'Abstract', 587)
 paragraph(
   intro,
-  'Reading an academic paper means moving between an argument and its supporting material. This sample demonstrates a reader that keeps that context close: hover over the green links below to inspect their targets, or Ctrl+click to open them in a second pane. On macOS, Command+click also works.',
+  'This document contains internal links, an external link, multiple columns and rotated pages. Hover over an internal link to preview its destination. Ctrl+click opens the destination in the other pane; Command+click also works on macOS.',
   55,
   558,
   485,

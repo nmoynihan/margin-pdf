@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { DocumentTab, newTabSnapshot } from '../../../src/renderer/src/components/DocumentTab'
 import { ErrorBoundary } from '../../../src/renderer/src/components/ErrorBoundary'
+import { Brand } from '../../../src/renderer/src/components/Controls'
 import { configureReaderHost } from '../../../src/renderer/src/host'
 import { zoomShortcut } from '../../../src/shared/shortcuts'
 import type { AppCommand, DocumentDescriptor, TabSnapshot } from '../../../src/shared/types'
@@ -28,6 +29,9 @@ function Reader() {
   const [fileError, setFileError] = useState<string>()
   const [error, setError] = useState('')
   const [target, setTarget] = useState<SyncTarget>()
+  const [toolbarTarget, setToolbarTarget] = useState<HTMLDivElement | null>(null)
+  const [paneToolbarTarget, setPaneToolbarTarget] = useState<HTMLDivElement | null>(null)
+  const [statusTarget, setStatusTarget] = useState<HTMLDivElement | null>(null)
   const handler = useRef<(command: AppCommand) => void>(() => {})
   const state = useRef<ReaderState | undefined>(undefined)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -99,7 +103,7 @@ function Reader() {
         }
         if (message.action === 'page') {
           const input = document.querySelector<HTMLInputElement>(
-            '.active-pane input[aria-label="Page number"]',
+            '.vscode-header input[aria-label="Page number"]',
           )
           if (input) {
             Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
@@ -138,6 +142,28 @@ function Reader() {
             links: document.querySelectorAll('.reader-pane .linkAnnotation a').length,
             overflow: document.documentElement.scrollWidth > window.innerWidth,
             bodyClass: document.body.className,
+            headerHeight: document.querySelector('.vscode-header')?.getBoundingClientRect().height,
+            inlineStatus: !!document.querySelector('.vscode-header .file-update-banner'),
+            innerToolbars: document.querySelectorAll(
+              '.document-tab .document-toolbar, .reader-pane .pane-toolbar',
+            ).length,
+            paneNames: document.querySelectorAll('.pane-label').length,
+            titleVisible: !!document.querySelector('.document-heading')?.getBoundingClientRect()
+              .width,
+            clippedControls: [
+              ...document.querySelectorAll<HTMLElement>(
+                '.vscode-header button, .vscode-header input, .vscode-header select, .vscode-header summary',
+              ),
+            ]
+              .filter(
+                (element) =>
+                  !element.closest('.reader-overflow-content') &&
+                  element.getBoundingClientRect().width,
+              )
+              .some((element) => {
+                const bounds = element.getBoundingClientRect()
+                return bounds.left < 0 || bounds.right > innerWidth + 1 || bounds.bottom > 43
+              }),
             errors,
           },
         })
@@ -172,6 +198,12 @@ function Reader() {
   }, [])
   return (
     <div className="vscode-reader">
+      <header className="vscode-header" aria-label="PDF controls">
+        <Brand small />
+        <div className="vscode-pane-tools" ref={setPaneToolbarTarget} />
+        <div className="vscode-status" ref={setStatusTarget} />
+        <div className="vscode-document-tools" ref={setToolbarTarget} />
+      </header>
       {boot && descriptor ? (
         <ErrorBoundary>
           <DocumentTab
@@ -179,6 +211,9 @@ function Reader() {
             initial={boot.state?.snapshot ?? newTabSnapshot(descriptor.id)}
             active
             compact
+            toolbarTarget={toolbarTarget}
+            paneToolbarTarget={paneToolbarTarget}
+            statusTarget={statusTarget}
             sidebar={sidebar}
             sidebarPosition="overlay"
             onSidebar={(value) => {

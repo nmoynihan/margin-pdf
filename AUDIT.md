@@ -1,5 +1,15 @@
 # Margin PDF security, quality, and product audit
 
+## 0.2.0 release note — 11 November 2026
+
+The historical audit below predates the public repository and current package metadata. Releases now use [nmoynihan/margin-pdf](https://github.com/nmoynihan/margin-pdf) and the maintainer's public contact details. Version 0.2.0 desktop packages are unsigned; no signed or notarised release is claimed.
+
+The production dependency audit reports no known vulnerabilities. The full development audit reports seven moderate findings through the packaging tools' minimatch dependency; [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249) concerns attacker-controlled glob patterns. Those packaging dependencies are not shipped in the application or extensions. This release does not change those dependencies.
+
+Chrome requests storage and scripting permissions. Host access is optional, used only for user-enabled PDF tab titles, and restricted by the user's domain settings. PDF reading does not require it. Domain rules and appearance preferences are stored locally; PDF URLs and titles are not saved in extension storage.
+
+## Historical audit
+
 Date: 29 October 2026
 
 Source reviewed: `255839d7c12f04774bc9876cbc316394affb3d29`

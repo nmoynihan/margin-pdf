@@ -32,6 +32,122 @@ body.vscode-high-contrast-light {
 }
 .vscode-reader > .boundary-content {
   flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.vscode-reader .document-tab {
+  flex: 1;
+  min-height: 0;
+}
+.vscode-header {
+  height: 42px;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  z-index: 10;
+}
+.vscode-header .brand-mark.small {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+.vscode-header .brand-glyph {
+  width: 100%;
+  height: 100%;
+  background: var(--ink);
+  mask: var(--brand-image) center / 100% no-repeat;
+}
+.vscode-pane-tools,
+.vscode-document-tools {
+  flex: 0 0 auto;
+}
+.vscode-header .pane-toolbar,
+.vscode-header .document-toolbar {
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  gap: 3px;
+  flex-wrap: nowrap;
+  border: 0;
+  background: transparent;
+}
+.vscode-header .document-heading,
+.vscode-header .pane-toolbar-spacer {
+  display: none;
+}
+.vscode-header .document-actions {
+  margin-left: 0;
+  gap: 3px;
+}
+.vscode-status {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.vscode-status .file-update-banner {
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  color: var(--accent);
+  min-width: 0;
+  padding: 0;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  flex-wrap: nowrap;
+}
+.vscode-status .file-update-banner > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vscode-status .file-update-banner > svg,
+.vscode-status .file-update-banner > button {
+  flex-shrink: 0;
+}
+@media (max-width: 850px) {
+  .vscode-header .pane-history {
+    display: none;
+  }
+}
+@media (max-width: 650px) {
+  .vscode-header {
+    gap: 3px;
+    padding-inline: 5px;
+  }
+  .vscode-header .icon-button {
+    width: 26px;
+    height: 28px;
+  }
+  .vscode-header .toolbar-divider,
+  .vscode-header .rotation-button,
+  .vscode-header .pane-toolbar button[aria-label='Close pane'],
+  .vscode-header .document-actions > button[aria-label='Reload PDF from disk'] {
+    display: none;
+  }
+  .vscode-header .overflow-reload {
+    display: block;
+  }
+  .vscode-header .page-control {
+    margin-right: 1px;
+    gap: 3px;
+  }
+  .vscode-header .pane-toolbar select {
+    width: 78px;
+  }
+}
+@media (max-width: 460px) {
+  .vscode-header .pane-toolbar button[aria-label='Zoom in'],
+  .vscode-header .pane-toolbar button[aria-label='Zoom out'] {
+    display: none;
+  }
 }
 .sync-hint {
   color: var(--muted);

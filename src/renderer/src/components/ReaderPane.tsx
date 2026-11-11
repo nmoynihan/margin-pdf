@@ -35,7 +35,6 @@ export function ReaderPane({
   onNavigation,
   onError,
   toolbarTarget,
-  paneLabel,
 }: {
   pane: PaneSnapshot
   loaded: LoadedDocument
@@ -53,7 +52,6 @@ export function ReaderPane({
   onNavigation(): void
   onError(message: string): void
   toolbarTarget?: HTMLElement | null
-  paneLabel?: string
 }) {
   const container = useRef<HTMLDivElement>(null)
   const controller = useRef<PaneController | null>(null)
@@ -279,12 +277,7 @@ export function ReaderPane({
         onClick={() => controller.current?.rotate()}
       />
       <span className="pane-toolbar-spacer" />
-      {split && (
-        <>
-          <span className="pane-label">{paneLabel ?? (active ? 'ACTIVE' : 'REFERENCE')}</span>
-          <IconButton icon={X} label="Close pane" onClick={onClose} />
-        </>
-      )}
+      {split && <IconButton icon={X} label="Close pane" onClick={onClose} />}
     </div>
   )
 

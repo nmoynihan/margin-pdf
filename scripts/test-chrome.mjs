@@ -2,14 +2,16 @@ import { chromium, expect } from '@playwright/test'
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { existsSync } from 'node:fs'
-import { mkdtemp, readFile, rm, mkdir, writeFile, copyFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, mkdir, writeFile, copyFile, cp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { PDFDocument } from 'pdf-lib'
 
 const directory = resolve('extensions/chrome/dist')
-const profile = await mkdtemp(join(tmpdir(), 'margin-chrome-test-'))
+const temporary = await mkdtemp(join(tmpdir(), 'margin-chrome-test-'))
+const profile = join(temporary, 'profile')
+const testExtension = join(temporary, 'extension')
 const results = resolve('test-results/chrome')
 await mkdir(results, { recursive: true })
 const paper = await readFile('tests/fixtures/paper.pdf')
@@ -29,7 +31,7 @@ const server = createServer((request, response) => {
   if (request.url === '/embed') {
     response.setHeader('content-type', 'text/html')
     response.end(
-      '<iframe title="Embedded PDF" src="/embedded-document" style="width:100%;height:700px"></iframe>',
+      '<title>Embedded PDF host</title><iframe title="Embedded PDF" src="/embedded-document" style="width:100%;height:700px"></iframe>',
     )
     return
   }
@@ -59,16 +61,46 @@ const executablePath =
   (existsSync('/usr/sbin/chromium') ? '/usr/sbin/chromium' : undefined)
 let context
 try {
+  // Pre-grant only the local fixture host in an isolated profile. Headless Chrome
+  // cannot accept its native optional-permission prompt. An extension upgrade
+  // from required to optional access preserves the grant; the actual test run
+  // uses the original, unmodified manifest and exercises the real permissions API.
+  await cp(directory, testExtension, { recursive: true })
+  const manifestPath = join(testExtension, 'manifest.json')
+  const originalManifest = await readFile(manifestPath, 'utf8')
+  await writeFile(
+    manifestPath,
+    JSON.stringify({
+      ...JSON.parse(originalManifest),
+      host_permissions: ['http://127.0.0.1/*', 'https://127.0.0.1/*'],
+    }),
+  )
+  const args = [
+    `--disable-extensions-except=${testExtension}`,
+    `--load-extension=${testExtension}`,
+    '--no-sandbox',
+  ]
+  context = await chromium.launchPersistentContext(profile, {
+    executablePath,
+    headless: true,
+    args,
+  })
+  const bootstrapWorker =
+    context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'))
+  assert(
+    await bootstrapWorker.evaluate(() =>
+      chrome.permissions.contains({ origins: ['http://127.0.0.1/*', 'https://127.0.0.1/*'] }),
+    ),
+  )
+  await context.close()
+  context = undefined
+  await writeFile(manifestPath, originalManifest)
   context = await chromium.launchPersistentContext(profile, {
     executablePath,
     headless: true,
     viewport: { width: 1280, height: 800 },
     acceptDownloads: true,
-    args: [
-      `--disable-extensions-except=${directory}`,
-      `--load-extension=${directory}`,
-      '--no-sandbox',
-    ],
+    args,
   })
   const version = context.browser()?.version()
   assert(
@@ -100,7 +132,7 @@ try {
   }
   const visiblePdf = async (reader) => {
     await expect(reader.locator('.reader-pane canvas').first()).toBeVisible({ timeout: 20_000 })
-    await expect(reader.locator('.document-title')).toContainText('Reading without losing')
+    await expect(reader.locator('.document-title')).toContainText('Sample paper on PDF navigation')
   }
   const action = async (reader, name) => {
     const button = reader.getByRole('button', { name, exact: true })
@@ -131,7 +163,25 @@ try {
   const pdf = await newPage()
   await pdf.goto(`${origin}/document`)
   const reader = await readerFrame(pdf)
+  const resizeReader = async (width) => {
+    await pdf.setViewportSize({ width, height: 800 })
+    await expect.poll(() => reader.evaluate(() => innerWidth)).toBe(width)
+    await expect(reader.locator('.split-area')).toHaveClass(width < 620 ? /vertical/ : /horizontal/)
+    await reader.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    )
+  }
   await visiblePdf(reader)
+  const originalTabTitle = await pdf.title()
+  assert.equal(
+    await worker.evaluate(
+      async () =>
+        (await chrome.storage.local.get('preferences')).preferences?.titleMode ?? 'website',
+    ),
+    'website',
+  )
+  await expect(reader.locator('.pane-label')).toHaveCount(0)
+  await expect(reader.getByRole('button', { name: /Reload PDF/ })).toHaveCount(0)
   assert.equal(pdf.url(), `${origin}/document`)
   assert.equal(requests.filter((request) => request.url === '/document').length, 1)
   const link = reader.locator('.reader-pane .page[data-page-number="1"] .linkAnnotation a').first()
@@ -213,7 +263,7 @@ try {
     reader.locator('.browser-header').getByRole('button', { name: 'Open PDF', exact: true }),
   ).toHaveCount(0)
   for (const width of [1440, 1280, 1100, 1024, 1000, 800, 420, 360]) {
-    await pdf.setViewportSize({ width, height: 800 })
+    await resizeReader(width)
     const header = await reader.locator('.browser-header').boundingBox()
     assert(header.height <= 44, `Header must remain one row at ${width}px`)
     const clipped = await reader.locator('.browser-header').evaluate((header) => {
@@ -236,12 +286,12 @@ try {
     if (width > 1000) {
       const title = reader.locator('.browser-header .document-title')
       await expect(title).toBeVisible()
-      await expect(title).toHaveAttribute('title', /Reading without losing/)
+      await expect(title).toHaveAttribute('title', /Sample paper on PDF navigation/)
       const titleBox = await title.boundingBox()
       assert(titleBox.y >= header.y && titleBox.y + titleBox.height <= header.y + header.height)
     } else await expect(reader.locator('.browser-header .document-heading')).toBeHidden()
   }
-  await pdf.setViewportSize({ width: 1280, height: 800 })
+  await resizeReader(1280)
   console.log(
     'PASS: one compact toolbar, centred document title, active-pane controls and responsive layout',
   )
@@ -259,6 +309,24 @@ try {
   await search.fill('reference')
   await search.press('Enter')
   await expect(reader.locator('.active-pane .find-bar')).toContainText(/\d+ \/ \d+/)
+  for (const width of [1280, 800, 420, 360]) {
+    await resizeReader(width)
+    await expect
+      .poll(
+        () =>
+          reader.locator('.reader-pane').evaluateAll((panes) =>
+            panes.every((pane) => {
+              const box = pane.getBoundingClientRect()
+              const find = pane.querySelector('.find-bar').getBoundingClientRect()
+              return find.width <= box.width / 2 + 1 && Math.abs(find.right - box.right) <= 1
+            }),
+          ),
+        `Search must align right and use at most half a pane at ${width}px`,
+      )
+      .toBe(true)
+  }
+  await resizeReader(1280)
+  await pdf.screenshot({ path: join(results, 'search-right-aligned.png') })
   await reader.locator('.active-pane').getByRole('button', { name: 'Close search' }).click()
   console.log(
     'PASS: native MIME handler, unchanged URL, single fetch, preview, split panes and search',
@@ -366,6 +434,54 @@ try {
   await againSettings.getByRole('button', { name: 'Done', exact: true }).click()
   console.log('PASS: preferences, opt-in content-based position restore and history deletion')
 
+  assert.equal(await pdf.title(), originalTabTitle, 'PDF titles must be opt-in')
+  const titleSettings = await settings(reader)
+  await expect(titleSettings.getByRole('link', { name: 'GitHub' })).toHaveAttribute(
+    'href',
+    'https://github.com/nmoynihan/margin-pdf',
+  )
+  const titleMode = titleSettings.getByLabel('Chrome tab title', { exact: true })
+  await expect(titleMode).toHaveValue('website')
+  await titleMode.selectOption('domains')
+  await expect(titleSettings.getByLabel('Title domains')).toHaveValue('arxiv.org')
+  await titleSettings.getByLabel('Title domains').fill('127.0.0.1')
+  await titleSettings.getByRole('button', { name: 'Apply title settings' }).click()
+  await expect(titleSettings.getByRole('status')).toContainText('Tab title settings saved.')
+  await expect.poll(() => pdf.title()).toBe('Sample paper on PDF navigation')
+  assert.equal(pdf.url(), `${origin}/document`)
+  const titlePrefs = await worker.evaluate(
+    async () => (await chrome.storage.local.get('preferences')).preferences,
+  )
+  await worker.evaluate((preferences) => chrome.storage.local.set({ preferences }), {
+    ...titlePrefs,
+    titleDomains: ['arxiv.org'],
+  })
+  await expect.poll(() => pdf.title()).toBe(originalTabTitle)
+  await worker.evaluate((preferences) => chrome.storage.local.set({ preferences }), titlePrefs)
+  await expect.poll(() => pdf.title()).toBe('Sample paper on PDF navigation')
+  await titleMode.selectOption('website')
+  await titleSettings.getByRole('button', { name: 'Apply title settings' }).click()
+  await expect.poll(() => pdf.title()).toBe(originalTabTitle)
+  await titleMode.selectOption('domains')
+  await titleSettings.getByRole('button', { name: 'Apply title settings' }).click()
+  await expect.poll(() => pdf.title()).toBe('Sample paper on PDF navigation')
+  await titleSettings.getByRole('button', { name: 'Done', exact: true }).click()
+  assert.deepEqual(
+    await welcome.evaluate(
+      (originalUrl) =>
+        chrome.runtime.sendMessage({
+          type: 'pdf-tab-title',
+          title: 'Not a PDF title',
+          originalUrl,
+        }),
+      `${origin}/document`,
+    ),
+    { changed: false },
+  )
+  console.log(
+    'PASS: opt-in PDF tab titles, domain restrictions, original-title restoration and GitHub settings link',
+  )
+
   const posted = await newPage()
   await posted.goto(`${origin}/post`)
   await posted.getByRole('button', { name: 'Read posted PDF' }).click()
@@ -384,6 +500,7 @@ try {
   await embedded.goto(`${origin}/embed`)
   const embeddedReader = await readerFrame(embedded)
   await visiblePdf(embeddedReader)
+  await expect.poll(() => embedded.title()).toBe('Embedded PDF host')
   const embeddedTabId = await embeddedReader.evaluate(
     async () => (await chrome.mimeHandler.getStreamInfo()).tabId,
   )
@@ -489,9 +606,10 @@ try {
   await offSettings.getByRole('checkbox', { name: 'Open PDFs in Margin PDF' }).check()
   console.log('PASS: automatic PDF handling can be disabled and re-enabled')
 
-  // The package itself must remain self-contained and request only local storage.
+  // Site access is optional and title-specific; PDF reading needs no host grant.
   const manifest = JSON.parse(await readFile(join(directory, 'manifest.json'), 'utf8'))
-  assert.deepEqual(manifest.permissions, ['storage'])
+  assert.deepEqual(manifest.permissions, ['storage', 'scripting'])
+  assert.deepEqual(manifest.optional_host_permissions, ['http://*/*', 'https://*/*'])
   assert.equal(manifest.manifest_version, 3)
   assert(!manifest.host_permissions)
   assert(!manifest.content_scripts)
@@ -522,5 +640,5 @@ try {
 } finally {
   await context?.close()
   await new Promise((resolve) => server.close(resolve))
-  await rm(profile, { recursive: true, force: true })
+  await rm(temporary, { recursive: true, force: true })
 }

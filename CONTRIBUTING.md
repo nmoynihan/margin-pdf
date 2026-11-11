@@ -28,7 +28,7 @@ Linux desktop integration tests need a graphical session or Xvfb. Use `node scri
 
 ## Source releases
 
-Keep the versions in the root package, Chrome manifest and VS Code package synchronized. Update the changelogs, then run `npm run check:release`. Build artifacts and generated fixtures are excluded from Git; the build scripts recreate them from source and the lockfile.
+Each set of changes increases the version: minor for small changes (0.1.0 → 0.2.0), patch for tiny changes (0.2.0 → 0.2.1). Keep the versions in the root package, lockfile, Chrome manifest and VS Code package synchronized. Update both changelogs, then run `npm run check:release`. Fixes made while completing one set share that set's version. Build artifacts and generated fixtures are excluded from Git; the build scripts recreate them from source and the lockfile.
 
 The CI workflow builds and tests each edition. A version tag such as `v0.1.0` additionally assembles a draft GitHub Release with the packaged artifacts and checksums after all build jobs succeed. Review the draft before publishing it. Store submissions and AUR updates remain separate manual steps; the source-release workflow does not publish to those services.
 

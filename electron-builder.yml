@@ -42,7 +42,7 @@ linux:
   syncDesktopName: true
   icon: resources/margin-pdf-icon.png
   category: Office
-  synopsis: A focused academic PDF reader
+  synopsis: 'Margin PDF: A reader built for papers.'
   target:
     - target: AppImage
       arch: [x64]
@@ -56,7 +56,7 @@ pacman:
   fpm:
     - --iteration=1
     # Pacman's PKGINFO requires a single-line description.
-    - --description=A focused academic PDF reader with link previews and independent split panes.
+    - '--description=Margin PDF: A reader built for papers.'
   # Electron bundles its own codecs; these are its host runtime libraries.
   depends:
     - alsa-lib

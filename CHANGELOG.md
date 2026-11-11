@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0 — 2026-11-11
+
+- Removed promotional copy and visible pane names across editions.
+- Right-aligned search bars use at most half the pane width.
+- Chrome: optional PDF titles in browser tabs, with domain rules prefilled with arxiv.org; removed in-memory reload controls and added a GitHub link in settings.
+- VS Code: one toolbar without a document title; update messages appear in that toolbar, can be dismissed, and expire after 15 seconds.
+- Prebuilt Windows, macOS, Linux, Chrome and VS Code packages are available on GitHub Releases, with SHA-256 checksums. Desktop installers are unsigned.
+
 ## 0.1.0 — 2026-11-11
 
 First public source release of Margin PDF.

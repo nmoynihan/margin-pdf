@@ -17,11 +17,9 @@ for (const [name, width, height] of [
   context.textAlign = 'center'
   context.fillStyle = '#283e35'
   context.font = `600 ${Math.min(32 * scale, 66)}px sans-serif`
-  context.fillText('Margin PDF', width / 2, height * 0.57)
+  context.fillText('Margin PDF:', width / 2, height * 0.57)
   context.font = `${Math.min(16 * scale, 30)}px sans-serif`
   context.fillStyle = '#477568'
-  context.fillText('Keep your place. Follow the idea.', width / 2, height * 0.72)
-  context.font = `${Math.min(12 * scale, 22)}px sans-serif`
-  context.fillText('Link previews  ·  Split panes  ·  Private by design', width / 2, height * 0.85)
+  context.fillText('A reader built for papers.', width / 2, height * 0.72)
   await writeFile(`dist/chrome-store/${name}.png`, canvas.toBuffer('image/png'))
 }

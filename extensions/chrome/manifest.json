@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Margin PDF",
-  "version": "0.1.0",
-  "description": "Read PDFs with instant link previews, independent split panes, search, and a focused reading interface.",
+  "version": "0.2.0",
+  "description": "Margin PDF: A reader built for papers.",
   "minimum_chrome_version": "151",
-  "permissions": ["storage"],
+  "permissions": ["storage", "scripting"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
   "icons": {
     "16": "icons/16.png",
     "32": "icons/32.png",

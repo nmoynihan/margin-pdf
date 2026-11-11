@@ -1,8 +1,8 @@
 {
   "name": "margin-pdf",
   "productName": "Margin PDF",
-  "version": "0.1.0",
-  "description": "A focused academic PDF reader with link previews and independent split panes.",
+  "version": "0.2.0",
+  "description": "Margin PDF: A reader built for papers.",
   "author": {
     "name": "Nathan Moynihan",
     "email": "n.moynihan@qmul.ac.uk",

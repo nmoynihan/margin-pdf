@@ -8,7 +8,7 @@
   <body>
     <main>
       <h1>Margin PDF privacy policy</h1>
-      <p>Effective 10 November 2026. This policy covers the Margin PDF Chrome extension.</p>
+      <p>Effective 11 November 2026. This policy covers the Margin PDF Chrome extension.</p>
       <h2>Your documents</h2>
       <p>
         Margin PDF renders PDFs locally on your device. It receives PDF data that Chrome has already
@@ -22,12 +22,12 @@
       </p>
       <h2>Settings and optional reading positions</h2>
       <p>
-        Appearance preferences and the reading-position preference are saved in local extension
-        storage. Reading-position history is off by default. If you enable it, the extension saves
-        page, scroll, zoom, rotation, and split-pane positions for up to 100 documents on this
-        device. Documents are identified by a SHA-256 fingerprint of their contents. The saved
-        records contain no document contents, filenames, or URLs. These fingerprints are
-        identifiers, not a claim of anonymisation.
+        Appearance preferences, tab-title preferences, user-specified title domains and the
+        reading-position preference are saved in local extension storage. Reading-position history
+        is off by default. If you enable it, the extension saves page, scroll, zoom, rotation, and
+        split-pane positions for up to 100 documents on this device. Documents are identified by a
+        SHA-256 fingerprint of their contents. The saved records contain no document contents,
+        filenames, or URLs. These fingerprints are identifiers, not a claim of anonymisation.
       </p>
       <p>
         You can clear saved positions in Reader settings. Turning off “Remember reading positions”
@@ -38,14 +38,18 @@
       <p>
         The extension includes its reader code, PDF worker, fonts, and sample document. It has no
         analytics, advertising, tracking, accounts, or remote code. It does not request permission
-        to read browsing history or access all websites. Following an external link opens that
-        destination in a new Chrome tab; the destination’s own privacy policy then applies.
+        to read browsing history. Following an external link opens that destination in a new Chrome
+        tab; the destination’s own privacy policy then applies.
       </p>
       <h2>Permissions</h2>
       <p>
         The storage permission saves preferences and optional reading positions. Chrome’s
-        PDF-handler registration routes PDFs to the extension. No host-access, browsing-history,
-        downloads, or native-messaging permissions are requested.
+        PDF-handler registration routes PDFs to the extension. The scripting permission changes a
+        full-page PDF's browser tab title when you enable that option. Enabling PDF titles requests
+        optional access to your selected domains, or to all HTTP/HTTPS websites if you choose that
+        scope. This feature is off by default, and the domain list starts with arxiv.org. The
+        extension does not inject PDF code into websites or rename pages containing embedded PDFs.
+        Browsing-history, downloads and native-messaging permissions are not requested.
       </p>
       <h2>Questions</h2>
       <p>

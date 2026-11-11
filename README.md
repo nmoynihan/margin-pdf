@@ -1,6 +1,8 @@
 # Margin PDF
 
-A PDF reader for academic papers, with a desktop app, Chrome extension and VS Code editor. Built with React, TypeScript and Mozilla PDF.js; the desktop app uses Electron.
+Margin PDF: A reader built for papers.
+
+Available as a desktop app, Chrome extension and VS Code editor. Built with React, TypeScript and Mozilla PDF.js; the desktop app uses Electron.
 
 [Source and issues](https://github.com/nmoynihan/margin-pdf) · [Releases](https://github.com/nmoynihan/margin-pdf/releases) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
@@ -8,9 +10,21 @@ Also available as a **Chrome extension** (Chrome 151+), sharing the same PDF rea
 
 The Chrome reader uses one compact toolbar containing the Margin PDF logo, page and zoom controls, the document title when there is room, sidebar, search and split-view controls. Select either pane to control its position and zoom from that bar. Ctrl/Cmd+Plus and Minus zoom the active PDF pane while the toolbar stays the same size. Printing and fullscreen are in **More reader actions**; local files can be opened from the welcome screen or with Ctrl/Cmd+O.
 
-The [VS Code edition](extensions/vscode/README.md) adds local forward/reverse SyncTeX. Store and AUR listings are not yet published. GitHub version tags build draft releases for review; desktop CI installers are unsigned test builds.
+The [VS Code edition](extensions/vscode/README.md) adds local forward/reverse SyncTeX. Store and AUR listings are not yet published.
 
-The logo combines an open book, an **M**, and a vertical page margin in eucalyptus green and ivory. The [master artwork](resources/branding/margin-pdf-icon-master.png), [transparent mark](resources/branding/margin-pdf-mark.png), and [design prompts](resources/branding/design.json) live in `resources/branding/`. `npm run assets` exports the desktop PNG, Windows ICO, and macOS ICNS icons from the master.
+## Downloads
+
+Get prebuilt packages from [GitHub Releases](https://github.com/nmoynihan/margin-pdf/releases/latest):
+
+| Platform                    | Packages                                                               |
+| --------------------------- | ---------------------------------------------------------------------- |
+| Windows x64                 | `.exe` installer                                                       |
+| macOS Intel / Apple Silicon | Separate `.dmg` installers                                             |
+| Linux x64                   | AppImage, Debian `.deb`, Arch `.pkg.tar.zst`                           |
+| Chrome                      | Extension `.zip`; extract and load unpacked from `chrome://extensions` |
+| VS Code                     | `.vsix`; install with **Extensions: Install from VSIX…**               |
+
+Each release includes `SHA256SUMS`. Desktop installers are unsigned; Windows and macOS may require approval through their security prompts.
 
 Hover over an internal PDF link to read the target in a selectable, scrollable preview. **Ctrl+click** opens that target in a second pane without losing your reading position. Further Ctrl+clicks navigate the opposite pane, from either side. **Cmd+click** also works on macOS.
 
@@ -112,7 +126,7 @@ To build and install manually:
 
 ```sh
 npm run dist:arch
-sudo pacman -U dist/margin-pdf-0.1.0-1-x86_64.pkg.tar.zst
+sudo pacman -U dist/margin-pdf-0.2.0-1-x86_64.pkg.tar.zst
 ```
 
 If you already have the package, only the `pacman -U` step is needed; Node.js/npm are build requirements, not installation requirements. Pacman installs the required system libraries. Open your app launcher and search for **Margin PDF**, or run `margin-pdf`. The application bundles Electron, the PDF renderer and all reading assets for offline use.
@@ -138,9 +152,9 @@ npm run dist:win    # x64 NSIS installer
 npm run dist:mac    # Intel and Apple Silicon DMGs
 ```
 
-Outputs are written to `dist/`. Build on the matching operating system; macOS packaging requires macOS. The included GitHub Actions workflow runs tests and builds each platform’s installers, retaining them as workflow artifacts. It does not publish releases. Ordinary CI artifacts may be unsigned. The opt-in `npm run dist:release` profile requires code signing on Windows/macOS and enables macOS notarisation; credentials and real project metadata remain required. See [SECURITY.md](SECURITY.md) for exact release inputs, platform verification, and the security-update process. Updates are manual.
+Outputs are written to `dist/`. Build on the matching operating system; macOS packaging requires macOS. The included GitHub Actions workflow runs tests and builds each platform’s installers, retaining them as workflow artifacts. Version tags additionally assemble draft GitHub Releases after every build job succeeds. Published releases include tested packages and checksums. Desktop packages currently use real project metadata and are unsigned. The opt-in `npm run dist:release` profile requires code signing on Windows/macOS and enables macOS notarisation; signing credentials remain required. See [SECURITY.md](SECURITY.md) for exact release inputs, platform verification, and the security-update process. Updates are manual.
 
-Development package metadata uses the reserved `margin-pdf.invalid` domain. Replace the homepage and maintainer email in `package.json` with the project’s real details before publishing packages.
+Package metadata points to the public project repository and maintainer.
 
 ## Checks
 
@@ -165,7 +179,7 @@ The VS Code extension is built from the same React/PDF.js reader as the desktop 
 
 ```sh
 npm run dist:vscode
-code --install-extension dist/margin-pdf-reader-0.1.0.vsix
+code --install-extension dist/margin-pdf-reader-0.2.0.vsix
 ```
 
 In a LaTeX source file, run **Margin PDF: Open PDF Beside Source** or **Margin PDF: Sync PDF from Cursor**. Ctrl+click PDF content to reveal its source; Ctrl+click PDF links still opens the opposite pane. LaTeX Workshop continues to handle compilation. Build with `-synctex=1`. For ordinary PDFs, choose **Reopen Editor With… → Margin PDF**.

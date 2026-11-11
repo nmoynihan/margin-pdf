@@ -20,6 +20,12 @@ interface Probe {
   errors: string[]
   revision?: string
   pixel: number[]
+  headerHeight: number
+  inlineStatus: boolean
+  innerToolbars: number
+  paneNames: number
+  titleVisible: boolean
+  clippedControls: boolean
 }
 const probe = (action?: string, value?: unknown) =>
   vscode.commands.executeCommand<Probe>('marginPdf.testProbe', action, value)
@@ -72,6 +78,11 @@ export async function run() {
   )
   assert.equal(view.state.snapshot.panes.length, 1)
   assert.equal(view.overflow, false)
+  assert.equal(view.headerHeight, 42)
+  assert.equal(view.innerToolbars, 0)
+  assert.equal(view.paneNames, 0)
+  assert.equal(view.titleVisible, false)
+  assert.equal(view.clippedControls, false)
   console.log('PASS: shared reader renders inside a real VS Code webview')
 
   await vscode.commands.executeCommand('marginPdf.syncFromCursor')
@@ -113,6 +124,10 @@ export async function run() {
   )
   assert.equal(view.state.snapshot.panes[0].position.page, 1)
   assert.equal(view.state.snapshot.panes[1].position.page, 2)
+  assert.equal(view.headerHeight, 42)
+  assert.equal(view.innerToolbars, 0)
+  assert.equal(view.paneNames, 0)
+  assert.equal(view.clippedControls, false)
   await probe('command', 'rotate')
   await probe('command', 'zoom-in')
   view = await until(
@@ -152,6 +167,16 @@ export async function run() {
     (p) => p.revision !== beforeBuild && p.canvases > 0,
     'A real LaTeX rebuild reloads',
   )
+  view = await until(
+    (p) => /Updated from disk/.test(p.fileStatus ?? ''),
+    'Disk-update status appears',
+  )
+  assert.equal(view.inlineStatus, true)
+  assert.equal(view.headerHeight, 42)
+  await probe('click', {
+    selector: '.file-update-banner button[aria-label="Dismiss update message"]',
+  })
+  await until((p) => !p.fileStatus, 'Disk-update status can be dismissed')
   const bytes = await readFile(pdf)
   const previous = view.revision
   await writeFile(`${pdf}.replacement`, bytes)
@@ -163,6 +188,7 @@ export async function run() {
   assert.equal(view.state.snapshot.panes.length, 2)
   assert.equal(view.state.snapshot.panes[0].position.rotation, saved.panes[0].position.rotation)
   assert.equal(view.state.snapshot.panes[0].position.zoom, saved.panes[0].position.zoom)
+  await until((p) => !p.fileStatus, 'Disk-update status expires after 15 seconds', 20_000)
   await writeFile(pdf, Buffer.from('temporarily incomplete PDF'))
   view = await until(
     (p) => /Keeping the current PDF/i.test(p.fileStatus ?? ''),

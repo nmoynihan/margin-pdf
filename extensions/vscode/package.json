@@ -1,8 +1,8 @@
 {
   "name": "margin-pdf-reader",
   "displayName": "Margin PDF",
-  "description": "Academic PDF reading with link previews, independent split panes, and bidirectional SyncTeX.",
-  "version": "0.1.0",
+  "description": "Margin PDF: A reader built for papers.",
+  "version": "0.2.0",
   "publisher": "margin-pdf",
   "license": "MIT",
   "engines": {

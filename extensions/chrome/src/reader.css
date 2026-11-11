@@ -189,6 +189,32 @@
 .browser-settings input[type='checkbox'] {
   accent-color: var(--accent);
 }
+.browser-settings .title-settings {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin: 20px 0;
+  padding: 10px 12px;
+  min-width: 0;
+}
+.browser-settings .title-settings select {
+  min-width: 0;
+  max-width: 60%;
+}
+.browser-settings .domain-setting {
+  display: flex;
+  align-items: stretch;
+  flex-direction: column;
+  gap: 8px;
+}
+.browser-settings textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 8px;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
 .browser-settings p {
   color: var(--muted);
   line-height: 1.6;

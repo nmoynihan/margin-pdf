@@ -1,19 +1,44 @@
 import { sanitizeSession } from '../../../src/shared/session'
 import type { Skin, TabSnapshot, Theme } from '../../../src/shared/types'
 import { chromeAPI } from './chrome'
+import { normalizeTitleDomains, type TitleMode } from './title-rules'
 
 export interface Preferences {
   theme: Theme
   skin: Skin
   remember: boolean
+  titleMode: TitleMode
+  titleDomains: string[]
 }
-export const defaultPreferences: Preferences = { theme: 'system', skin: 'classic', remember: false }
+export const defaultPreferences: Preferences = {
+  theme: 'system',
+  skin: 'classic',
+  remember: false,
+  titleMode: 'website',
+  titleDomains: ['arxiv.org'],
+}
 
 export async function readPreferences(): Promise<Preferences> {
   const { preferences } = await chromeAPI.storage.local.get('preferences')
   const value = (preferences ?? {}) as Partial<Preferences>
   const clean = sanitizeSession({ version: 1, ...value })
-  return { theme: clean.theme, skin: clean.skin, remember: value.remember === true }
+  let titleDomains = defaultPreferences.titleDomains
+  try {
+    if (Array.isArray(value.titleDomains))
+      titleDomains = normalizeTitleDomains(
+        value.titleDomains.filter((entry) => typeof entry === 'string').join('\n'),
+      )
+  } catch {
+    /* Ignore invalid stored domain rules. */
+  }
+  return {
+    theme: clean.theme,
+    skin: clean.skin,
+    remember: value.remember === true,
+    titleMode:
+      value.titleMode === 'all' || value.titleMode === 'domains' ? value.titleMode : 'website',
+    titleDomains,
+  }
 }
 
 export async function readPosition(id: string): Promise<TabSnapshot | undefined> {

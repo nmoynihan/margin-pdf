@@ -213,7 +213,7 @@ else {
     handle('open-sample', async () => {
       const samples = join(app.getPath('userData'), 'Samples')
       await mkdir(samples, { recursive: true })
-      const path = join(samples, 'Reading without losing the thread.pdf')
+      const path = join(samples, 'Sample paper on PDF navigation.pdf')
       await copyFile(join(here, '../renderer/sample.pdf'), path)
       return openPaths([path])
     })

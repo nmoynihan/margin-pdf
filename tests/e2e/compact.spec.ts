@@ -9,7 +9,7 @@ let app: ElectronApplication
 let profile: string
 const flags = process.platform === 'linux' ? ['--no-sandbox', '--disable-gpu'] : []
 async function launch(compact: boolean, files = ['paper.pdf']) {
-  profile ??= await mkdtemp(join(tmpdir(), 'margin-compact-'))
+  profile ||= await mkdtemp(join(tmpdir(), 'margin-compact-'))
   app = await electron.launch({
     executablePath: electronPath as unknown as string,
     args: [

@@ -16,6 +16,13 @@ async function collect(directory) {
 }
 await collect('release-artifacts')
 if (!assets.length) throw new Error('No release packages were downloaded.')
+for (const suffix of ['.exe', '.AppImage', '.deb', '.pkg.tar.zst', '.vsix'])
+  if (!assets.some((path) => path.endsWith(suffix)))
+    throw new Error(`Missing release package: ${suffix}`)
+if (assets.filter((path) => path.endsWith('.dmg')).length < 2)
+  throw new Error('Both Intel and Apple Silicon macOS installers are required.')
+if (!assets.some((path) => /^margin-pdf-chrome-.*\.zip$/.test(basename(path))))
+  throw new Error('Missing Chrome extension ZIP.')
 const names = assets.map((path) => basename(path))
 if (new Set(names).size !== names.length) throw new Error('Release artifact filenames collide.')
 await mkdir('release-upload', { recursive: true })

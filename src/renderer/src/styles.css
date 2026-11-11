@@ -671,6 +671,9 @@ button svg {
 }
 .find-bar {
   flex-shrink: 0;
+  align-self: flex-end;
+  width: 50%;
+  min-width: 0;
   height: 41px;
   display: flex;
   align-items: center;
