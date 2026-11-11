@@ -9,6 +9,7 @@ First public source release of Margin PDF.
 - Automatic reload when a local PDF is rebuilt, preserving pane positions and zoom.
 - Immediate reading-position capture after navigation, so reload, layout changes and recovery retain the selected page even when scroll events are delayed.
 - Chrome extension using Chrome 151+ PDF integration, with one compact toolbar, active-pane page/zoom controls, downloads, printing and local preferences.
+- Chrome keyboard and browser zoom controls scale the active PDF pane while the toolbar stays fixed; the document title appears in the middle of the bar when space allows.
 - VS Code custom PDF editor with forward and reverse SyncTeX in trusted local workspaces.
 - Sequential print preparation with bounded 150 DPI tiles, supporting long documents and large sheets without a document-wide raster or page-count cutoff.
 - Sandboxed desktop renderer, bundled PDF workers/codecs, third-party notices and platform packaging checks.

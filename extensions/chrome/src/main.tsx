@@ -28,6 +28,7 @@ import {
   type Preferences,
 } from './storage'
 import { Settings } from './Settings'
+import { bindPdfZoom } from './zoom'
 import 'pdfjs-dist/web/pdf_viewer.css'
 import '../../../src/renderer/src/styles.css'
 import '../../../src/renderer/src/skins.css'
@@ -73,6 +74,7 @@ function Reader() {
   const printDialog = useRef<HTMLDialogElement>(null)
   const printFocus = useRef<HTMLElement | null>(null)
   const handler = useRef<(command: AppCommand) => void>(() => {})
+  const zoomHandler = useRef<((factor: number) => void) | null>(null)
   const currentSnapshot = useRef<TabSnapshot | undefined>(undefined)
   const currentPreferences = useRef(preferences)
   currentPreferences.current = preferences
@@ -83,6 +85,17 @@ function Reader() {
   const [toolbarTarget, setToolbarTarget] = useState<HTMLDivElement | null>(null)
   const [paneToolbarTarget, setPaneToolbarTarget] = useState<HTMLDivElement | null>(null)
   const printing = !!progress
+  const hasDocument = !!source
+  useEffect(() => {
+    if (!hasDocument) return
+    const abort = new AbortController()
+    void bindPdfZoom(nativePage, abort.signal, (factor) => {
+      if (!document.querySelector('dialog[open]')) zoomHandler.current?.(factor)
+    }).catch((reason) => {
+      if (!abort.signal.aborted) setError(`Could not enable PDF zoom: ${reason.message}`)
+    })
+    return () => abort.abort()
+  }, [hasDocument])
   useEffect(() => {
     if (!printing) return
     const dialog = printDialog.current!
@@ -171,10 +184,33 @@ function Reader() {
   const register = useCallback((_id: string, command: ((command: AppCommand) => void) | null) => {
     handler.current = command ?? (() => {})
   }, [])
+  const registerZoom = useCallback((zoom: ((factor: number) => void) | null) => {
+    zoomHandler.current = zoom
+  }, [])
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
       if (document.querySelector('dialog[open]')) return
       const modifier = event.ctrlKey || event.metaKey
+      const zoom = zoomShortcut(event, navigator.platform.includes('Mac') ? 'darwin' : 'linux')
+      // Zoom belongs to the PDF even while a page number or search field has focus.
+      if (zoom && zoomHandler.current) {
+        event.preventDefault()
+        event.stopPropagation()
+        zoomHandler.current(zoom === 'zoom-in' ? 1.2 : 1 / 1.2)
+        return
+      }
+      if (
+        zoomHandler.current &&
+        modifier &&
+        !event.altKey &&
+        !event.isComposing &&
+        event.key === '0'
+      ) {
+        event.preventDefault()
+        event.stopPropagation()
+        handler.current('fit-width')
+        return
+      }
       if (modifier && event.key.toLowerCase() === 'o') {
         event.preventDefault()
         if (!job.current) fileInput.current?.click()
@@ -182,8 +218,7 @@ function Reader() {
       }
       if ((event.target as HTMLElement).closest('input,select,textarea,[contenteditable]')) return
       const command =
-        zoomShortcut(event, navigator.platform.includes('Mac') ? 'darwin' : 'linux') ??
-        (modifier && event.key.toLowerCase() === 'f'
+        modifier && event.key.toLowerCase() === 'f'
           ? 'find'
           : modifier && event.key.toLowerCase() === 'p'
             ? 'print'
@@ -193,14 +228,14 @@ function Reader() {
                 ? 'back'
                 : event.altKey && event.key === 'ArrowRight'
                   ? 'forward'
-                  : undefined)
+                  : undefined
       if (command) {
         event.preventDefault()
         handler.current(command)
       }
     }
-    window.addEventListener('keydown', key)
-    return () => window.removeEventListener('keydown', key)
+    window.addEventListener('keydown', key, true)
+    return () => window.removeEventListener('keydown', key, true)
   }, [])
 
   const openFile = async (file: File) => {
@@ -352,6 +387,7 @@ function Reader() {
                 document.title = `${title} — Margin PDF`
               }}
               onCommandHandler={register}
+              onZoomHandler={registerZoom}
               onError={setError}
               onClose={() => {
                 setSource(undefined)

@@ -119,6 +119,13 @@ try {
   await welcome.screenshot({ path: join(results, 'store-welcome.png') })
   await welcome.getByRole('button', { name: 'Open sample PDF' }).click()
   await visiblePdf(welcome)
+  await expect
+    .poll(() =>
+      welcome.evaluate(async () =>
+        chrome.tabs.getZoomSettings((await chrome.tabs.getCurrent()).id),
+      ),
+    )
+    .toMatchObject({ mode: 'manual', scope: 'per-tab' })
   console.log('PASS: offline bundled sample and welcome screen')
 
   const pdf = await newPage()
@@ -139,13 +146,73 @@ try {
   await expect(reader.getByRole('textbox', { name: 'Page number' })).toHaveValue('4')
   await reader.locator('.reader-pane').first().locator('.pdf-container').focus()
   await expect(reader.getByRole('textbox', { name: 'Page number' })).toHaveValue('1')
+  const tabId = await reader.evaluate(async () => (await chrome.mimeHandler.getStreamInfo()).tabId)
+  await expect
+    .poll(() => worker.evaluate((id) => chrome.tabs.getZoomSettings(id), tabId))
+    .toMatchObject({ mode: 'manual', scope: 'per-tab' })
+  const panes = reader.locator('.reader-pane')
+  const scale = (index) =>
+    panes
+      .nth(index)
+      .locator('.pdfViewer')
+      .evaluate((element) =>
+        parseFloat(getComputedStyle(element).getPropertyValue('--scale-factor')),
+      )
+  const originalScales = await Promise.all([scale(0), scale(1)])
+  const uiMetrics = () =>
+    reader.evaluate(() => ({
+      dpr: devicePixelRatio,
+      header: document.querySelector('.browser-header').getBoundingClientRect().height,
+      button: document.querySelector('.browser-header .icon-button').getBoundingClientRect().width,
+    }))
+  const originalUi = await uiMetrics()
+  const keyboardZoom = async (target, key, factor, index) => {
+    const before = await scale(index)
+    await target.press(key)
+    await expect.poll(() => scale(index)).toBeCloseTo(before * factor, 3)
+    assert.deepEqual(await uiMetrics(), originalUi)
+  }
+  const firstPane = panes.first().locator('.pdf-container')
+  await keyboardZoom(firstPane, 'Control+=', 1.2, 0)
+  await keyboardZoom(firstPane, 'Control+-', 1 / 1.2, 0)
+  await keyboardZoom(firstPane, 'Control+Shift+Equal', 1.2, 0)
+  await keyboardZoom(firstPane, 'Control+NumpadSubtract', 1 / 1.2, 0)
+  await panes.nth(1).locator('.pdf-container').focus()
+  const pageNumber = reader.getByRole('textbox', { name: 'Page number' })
+  await keyboardZoom(pageNumber, 'Control+NumpadAdd', 1.2, 1)
+  await keyboardZoom(pageNumber, 'Control+-', 1 / 1.2, 1)
+  assert(Math.abs((await scale(0)) - originalScales[0]) < 0.001)
+
+  // Exercise Chrome's native zoom event path independently of DOM key delivery
+  // (the same path used by browser accelerators and the browser zoom menu).
+  let previousBrowserZoom = await worker.evaluate((id) => chrome.tabs.getZoom(id), tabId)
+  for (const next of [1.5, 1.25, 1]) {
+    const before = await scale(1)
+    await worker.evaluate(({ id, zoom }) => chrome.tabs.setZoom(id, zoom), {
+      id: tabId,
+      zoom: next,
+    })
+    await expect.poll(() => scale(1)).toBeCloseTo((before * next) / previousBrowserZoom, 3)
+    assert(Math.abs((await scale(0)) - originalScales[0]) < 0.001)
+    assert.deepEqual(await uiMetrics(), originalUi)
+    previousBrowserZoom = next
+  }
+  await reader.getByRole('button', { name: 'Find in paper', exact: true }).click()
+  const zoomSearch = reader.locator('.active-pane .find-bar input').first()
+  await keyboardZoom(zoomSearch, 'Control+=', 1.2, 1)
+  await keyboardZoom(zoomSearch, 'Control+-', 1 / 1.2, 1)
+  await reader.locator('.active-pane').getByRole('button', { name: 'Close search' }).click()
+  await panes.first().locator('.pdf-container').focus()
+  console.log(
+    'PASS: keyboard and native Chrome zoom affect only the active PDF pane; UI stays fixed',
+  )
   await expect(
     reader.locator('.browser-main .document-toolbar, .browser-main .pane-toolbar'),
   ).toHaveCount(0)
   await expect(
     reader.locator('.browser-header').getByRole('button', { name: 'Open PDF', exact: true }),
   ).toHaveCount(0)
-  for (const width of [1280, 800, 420, 360]) {
+  for (const width of [1440, 1280, 1100, 1024, 1000, 800, 420, 360]) {
     await pdf.setViewportSize({ width, height: 800 })
     const header = await reader.locator('.browser-header').boundingBox()
     assert(header.height <= 44, `Header must remain one row at ${width}px`)
@@ -166,10 +233,17 @@ try {
         .map((control) => control.getAttribute('aria-label'))
     })
     assert.deepEqual(clipped, [], `Header controls must fit at ${width}px`)
+    if (width > 1000) {
+      const title = reader.locator('.browser-header .document-title')
+      await expect(title).toBeVisible()
+      await expect(title).toHaveAttribute('title', /Reading without losing/)
+      const titleBox = await title.boundingBox()
+      assert(titleBox.y >= header.y && titleBox.y + titleBox.height <= header.y + header.height)
+    } else await expect(reader.locator('.browser-header .document-heading')).toBeHidden()
   }
   await pdf.setViewportSize({ width: 1280, height: 800 })
   console.log(
-    'PASS: one compact toolbar, active-pane controls, no Open PDF button and responsive layout',
+    'PASS: one compact toolbar, centred document title, active-pane controls and responsive layout',
   )
   await expect
     .poll(() =>
@@ -308,7 +382,16 @@ try {
 
   const embedded = await newPage()
   await embedded.goto(`${origin}/embed`)
-  await visiblePdf(await readerFrame(embedded))
+  const embeddedReader = await readerFrame(embedded)
+  await visiblePdf(embeddedReader)
+  const embeddedTabId = await embeddedReader.evaluate(
+    async () => (await chrome.mimeHandler.getStreamInfo()).tabId,
+  )
+  assert.equal(
+    (await worker.evaluate((id) => chrome.tabs.getZoomSettings(id), embeddedTabId)).mode,
+    'automatic',
+    'Embedded PDFs must preserve browser zoom for the host page',
+  )
   const local = await newPage()
   await local.goto(pathToFileURL(resolve('tests/fixtures/paper.pdf')).href)
   await visiblePdf(await readerFrame(local))
@@ -319,6 +402,19 @@ try {
   const hashReader = await readerFrame(hash)
   await visiblePdf(hashReader)
   await expect(hashReader.getByRole('textbox', { name: 'Page number' })).toHaveValue('3')
+  const hashTabId = await hashReader.evaluate(
+    async () => (await chrome.mimeHandler.getStreamInfo()).tabId,
+  )
+  await expect
+    .poll(() => worker.evaluate((id) => chrome.tabs.getZoomSettings(id), hashTabId))
+    .toMatchObject({ mode: 'manual', scope: 'per-tab' })
+  await hash.goto(`${origin}/post`)
+  await expect(hash.getByRole('button', { name: 'Read posted PDF' })).toBeVisible()
+  assert.equal(
+    (await worker.evaluate((id) => chrome.tabs.getZoomSettings(id), hashTabId)).mode,
+    'automatic',
+    'PDF zoom settings must reset when navigating to an ordinary web page',
+  )
   const upload = await newPage()
   await upload.goto(`${base}/welcome.html`)
   await upload.getByLabel('Choose PDF file').setInputFiles('tests/fixtures/paper.pdf')
@@ -339,6 +435,30 @@ try {
     .poll(() => dropped.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
     .toBe(true)
   console.log('PASS: page fragments, file picker, drag-and-drop and narrow layout')
+
+  // Closing a failed local PDF returns the welcome page to normal browser zoom;
+  // opening another PDF must install the handler again without duplicate events.
+  await upload.getByLabel('Choose PDF file').setInputFiles({
+    name: 'invalid.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('not a PDF'),
+  })
+  await expect(upload.getByRole('button', { name: 'Try again', exact: true })).toBeVisible()
+  await upload.getByRole('button', { name: 'Close tab', exact: true }).click()
+  await expect(upload.getByRole('button', { name: 'Open a PDF', exact: true })).toBeVisible()
+  await expect
+    .poll(() =>
+      upload.evaluate(async () => chrome.tabs.getZoomSettings((await chrome.tabs.getCurrent()).id)),
+    )
+    .toMatchObject({ mode: 'automatic', scope: 'per-origin' })
+  await upload.getByRole('button', { name: 'Open sample PDF' }).click()
+  await visiblePdf(upload)
+  await expect
+    .poll(() =>
+      upload.evaluate(async () => chrome.tabs.getZoomSettings((await chrome.tabs.getCurrent()).id)),
+    )
+    .toMatchObject({ mode: 'manual', scope: 'per-tab' })
+  console.log('PASS: PDF zoom restores normal browser settings on close and navigation')
 
   const locked = await newPage()
   await locked.goto(`${origin}/password`)

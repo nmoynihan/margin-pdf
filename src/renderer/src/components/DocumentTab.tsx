@@ -56,6 +56,7 @@ export function DocumentTab({
   onSnapshot,
   onTitle,
   onCommandHandler,
+  onZoomHandler,
   onError,
   onClose,
   onPrint,
@@ -83,6 +84,7 @@ export function DocumentTab({
   onSnapshot(snapshot: TabSnapshot): void
   onTitle(title: string): void
   onCommandHandler(id: string, handler: ((command: AppCommand) => void) | null): void
+  onZoomHandler?(handler: ((factor: number) => void) | null): void
   onError(message: string): void
   onClose(): void
   onPrint(loaded: LoadedDocument): void
@@ -116,8 +118,8 @@ export function DocumentTab({
   const current = useRef(initial)
   const controllers = useRef(new Map<string, PaneController>())
   const pending = useRef(new Map<string, ResolvedDestination>())
-  const callbacks = useRef({ onSnapshot, onTitle, onError, onCommandHandler })
-  callbacks.current = { onSnapshot, onTitle, onError, onCommandHandler }
+  const callbacks = useRef({ onSnapshot, onTitle, onError, onCommandHandler, onZoomHandler })
+  callbacks.current = { onSnapshot, onTitle, onError, onCommandHandler, onZoomHandler }
   const [hasBeenActive, setHasBeenActive] = useState(active)
   const [activePage, setActivePage] = useState(
     initial.panes.find((p) => p.id === initial.activePaneId)?.position.page ?? 1,
@@ -464,7 +466,14 @@ export function DocumentTab({
       }
     }
     callbacks.current.onCommandHandler(descriptor.id, handler)
-    return () => callbacks.current.onCommandHandler(descriptor.id, null)
+    callbacks.current.onZoomHandler?.((factor) => {
+      dismissPreview()
+      controllers.current.get(current.current.activePaneId)?.zoomBy(factor)
+    })
+    return () => {
+      callbacks.current.onCommandHandler(descriptor.id, null)
+      callbacks.current.onZoomHandler?.(null)
+    }
   })
 
   const startDrag = (event: React.PointerEvent<HTMLDivElement>) => {

@@ -20,7 +20,9 @@ Chrome routes documents served as `application/pdf`, including URLs without a `.
 
 Use **Reader settings → Open PDFs in Margin PDF** to disable automatic handling. The **Chrome viewer** button returns the current document to Chrome’s native reader. If several PDF-handler extensions are installed, Chrome selects the most recently installed handler. This build is not tested on other Chromium browsers or Firefox.
 
-The reader uses one compact bar containing the logo, page/zoom controls and document actions. Click or focus either reading pane to control that pane from the bar. There is no Open PDF button in the toolbar; use the welcome screen, drag-and-drop or Ctrl/Cmd+O for local files. Printing and fullscreen are in **More reader actions**, with download and reload moving there on narrow screens.
+The reader uses one compact bar containing the logo, page/zoom controls, the document title in the middle when there is room, and document actions. Click or focus either reading pane to control that pane from the bar. There is no Open PDF button in the toolbar; use the welcome screen, drag-and-drop or Ctrl/Cmd+O for local files. Printing and fullscreen are in **More reader actions**, with download and reload moving there on narrow screens.
+
+Ctrl/Cmd+Plus (or equals), Minus and the numeric keypad's plus/minus zoom only the active PDF pane, including while a page number or search field has focus. Ctrl/Cmd+0 fits the pane to its width. For full-page PDFs, Chrome's browser zoom controls also zoom the active PDF pane while the toolbar stays at its normal size. Embedded PDFs leave the surrounding web page's browser zoom unchanged.
 
 The reload button reparses the in-memory PDF. Use Chrome’s Reload to obtain a new copy from the source. Desktop file watching and SyncTeX are not available in the extension. PDFs are limited to 128 MiB. Printing prepares pages sequentially using one reusable canvas and compressed image tiles at 150 DPI; it has no page-count or combined raster-area cutoff. The working canvas is bounded to 8,388,608 pixels per tile, and large sheets use multiple tiles.
 

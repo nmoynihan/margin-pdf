@@ -6,7 +6,7 @@ A PDF reader for academic papers, with a desktop app, Chrome extension and VS Co
 
 Also available as a **Chrome extension** (Chrome 151+), sharing the same PDF reader and handling PDFs directly in browser tabs. Run `npm run dist:chrome` to create the Chrome Web Store upload ZIP, or see [Chrome installation and publishing](extensions/chrome/README.md). The desktop app does not need to be running.
 
-The Chrome reader uses one compact toolbar containing the Margin PDF logo, page and zoom controls, sidebar, search and split-view controls. Select either pane to control its position and zoom from that bar. Printing and fullscreen are in **More reader actions**; local files can be opened from the welcome screen or with Ctrl/Cmd+O.
+The Chrome reader uses one compact toolbar containing the Margin PDF logo, page and zoom controls, the document title when there is room, sidebar, search and split-view controls. Select either pane to control its position and zoom from that bar. Ctrl/Cmd+Plus and Minus zoom the active PDF pane while the toolbar stays the same size. Printing and fullscreen are in **More reader actions**; local files can be opened from the welcome screen or with Ctrl/Cmd+O.
 
 The [VS Code edition](extensions/vscode/README.md) adds local forward/reverse SyncTeX. Store and AUR listings are not yet published. GitHub version tags build draft releases for review; desktop CI installers are unsigned test builds.
 
