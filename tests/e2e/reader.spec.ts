@@ -404,7 +404,13 @@ test('multiple tabs retain their views, duplicate opens focus a tab, and closed 
   await expect(
     page.locator('.tab-panel:not([hidden])').getByRole('textbox', { name: 'Page number' }),
   ).toHaveValue('3')
+  // A duplicate open must finish focusing the requested tab before it is closed.
+  // The tab count is already two, so it cannot signal completion of that request.
+  await page.getByRole('tab', { name: 'Scanned document fixture' }).click()
   await chooseFile('paper.pdf')
+  await expect(
+    page.getByRole('tab', { name: 'Reading without losing the thread' }),
+  ).toHaveAttribute('aria-selected', 'true')
   await expect(page.getByRole('tab')).toHaveCount(2)
   await page.getByRole('button', { name: 'Close paper.pdf', exact: true }).click()
   await expect(page.getByRole('tab')).toHaveCount(1)
