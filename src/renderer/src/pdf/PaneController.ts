@@ -311,6 +311,9 @@ export class PaneController {
         destArray: resolved.explicit,
         ignoreDestinationZoom: true,
       })
+      // Publish coordinates now, before a delayed scroll animation frame can
+      // leave the saved snapshot behind the page number shown in the toolbar.
+      this.viewer.update()
       this.emit()
     } catch (error) {
       if (!this.disposed && request === this.navigationRequest)
@@ -358,6 +361,7 @@ export class PaneController {
       allowNegativeOffset: true,
     })
     this.position = { ...position, page }
+    this.viewer.update()
   }
   goBack() {
     const target = this.history.back(this.currentPosition())
@@ -375,6 +379,7 @@ export class PaneController {
   }
   zoom(value: string) {
     this.viewer.currentScaleValue = value
+    this.viewer.update()
     this.emit()
   }
   zoomBy(multiplier: number) {
@@ -382,6 +387,7 @@ export class PaneController {
   }
   rotate() {
     this.viewer.pagesRotation = (this.viewer.pagesRotation + 90) % 360
+    this.viewer.update()
     this.emit()
   }
   find(query: string, again = false, previous = false, caseSensitive = false) {

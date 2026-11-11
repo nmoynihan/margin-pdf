@@ -276,6 +276,43 @@ test('restores both pane positions, layout, zoom, and theme after restart', asyn
   ).toHaveValue('custom')
 })
 
+test('page navigation saves its position before delayed scroll animation frames', async () => {
+  await launch('paper.pdf')
+  await page.evaluate(() => {
+    const frame = window.requestAnimationFrame.bind(window)
+    const cancel = window.cancelAnimationFrame.bind(window)
+    const pending = new Map<number, FrameRequestCallback>()
+    let sequence = 1_000_000
+    window.requestAnimationFrame = (callback) => {
+      pending.set(++sequence, callback)
+      return sequence
+    }
+    window.cancelAnimationFrame = (id) => {
+      if (!pending.delete(id)) cancel(id)
+    }
+    ;(window as unknown as { resumeFrames: () => void }).resumeFrames = () => {
+      window.requestAnimationFrame = frame
+      window.cancelAnimationFrame = cancel
+      for (const callback of pending.values()) frame(callback)
+      pending.clear()
+    }
+  })
+  try {
+    const input = page.getByRole('textbox', { name: 'Page number' })
+    await input.fill('3')
+    await input.press('Enter')
+    await expect(input).toHaveValue('3')
+    await expect
+      .poll(async () => {
+        const state = JSON.parse(await readFile(join(userData, 'reader-state.json'), 'utf8'))
+        return state.session.tabs[0]?.panes[0]?.position.page
+      })
+      .toBe(3)
+  } finally {
+    await page.evaluate(() => (window as unknown as { resumeFrames: () => void }).resumeFrames())
+  }
+})
+
 test('password handling allows retry without storing the password', async () => {
   await launch('password.pdf')
   await page.getByRole('textbox', { name: 'PDF password' }).fill('wrong')
