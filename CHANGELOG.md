@@ -7,6 +7,7 @@
 - Chrome: optional PDF titles in browser tabs, with domain rules prefilled with arxiv.org; removed in-memory reload controls and added a GitHub link in settings.
 - VS Code: one toolbar without a document title; update messages appear in that toolbar, can be dismissed, and expire after 15 seconds.
 - Prebuilt Windows, macOS, Linux, Chrome and VS Code packages are available on GitHub Releases, with SHA-256 checksums. Desktop installers are unsigned.
+- Release filenames are normalized before generating checksums so they match GitHub's download names.
 
 ## 0.1.0 — 2026-11-11
 

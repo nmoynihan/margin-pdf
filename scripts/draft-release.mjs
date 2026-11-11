@@ -23,12 +23,15 @@ if (assets.filter((path) => path.endsWith('.dmg')).length < 2)
   throw new Error('Both Intel and Apple Silicon macOS installers are required.')
 if (!assets.some((path) => /^margin-pdf-chrome-.*\.zip$/.test(basename(path))))
   throw new Error('Missing Chrome extension ZIP.')
-const names = assets.map((path) => basename(path))
+// GitHub replaces spaces in uploaded asset names with dots. Use those names in
+// the upload directory and checksum file as well.
+const releaseName = (path) => basename(path).replaceAll(' ', '.')
+const names = assets.map(releaseName)
 if (new Set(names).size !== names.length) throw new Error('Release artifact filenames collide.')
 await mkdir('release-upload', { recursive: true })
 const checksums = []
 for (const path of assets.sort()) {
-  const name = basename(path)
+  const name = releaseName(path)
   await copyFile(path, join('release-upload', name))
   checksums.push(
     `${createHash('sha256')
