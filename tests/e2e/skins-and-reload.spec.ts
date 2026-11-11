@@ -90,10 +90,15 @@ test('skin browser previews, cancels, applies and restores all five appearances 
   await expect(page.locator('html')).toHaveAttribute('data-skin', 'focus')
   await chooseSkin('Studio')
   await expect
-    .poll(
-      async () =>
-        JSON.parse(await readFile(join(profile, 'reader-state.json'), 'utf8')).session.skin,
-    )
+    .poll(async () => {
+      try {
+        return JSON.parse(await readFile(join(profile, 'reader-state.json'), 'utf8')).session.skin
+      } catch (error) {
+        // The first save is debounced; a fresh profile may not have a state file yet.
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+        throw error
+      }
+    })
     .toBe('studio')
   const saved = profile
   await app.close()
