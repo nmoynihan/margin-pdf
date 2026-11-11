@@ -1,0 +1,8 @@
+# Keep source formatting identical on Linux, macOS and Windows checkouts.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+*.icns binary
+*.pdf binary
+*.wasm binary
