@@ -12,5 +12,13 @@
     "types": ["node", "vite/client"],
     "noEmit": true
   },
-  "include": ["src", "tests", "*.config.ts"]
+  "include": [
+    "src",
+    "tests",
+    "*.config.ts",
+    "extensions/vscode/**/*.ts",
+    "extensions/vscode/**/*.tsx",
+    "extensions/chrome/**/*.ts",
+    "extensions/chrome/**/*.tsx"
+  ]
 }

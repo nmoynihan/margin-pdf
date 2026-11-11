@@ -13,14 +13,17 @@ import {
 import { dirname, join, relative, resolve, extname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { mkdir, copyFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { ReaderStore } from './store'
-import type { AppCommand } from '../shared/types'
+import { DocumentMonitor } from './DocumentMonitor'
+import type { AppCommand, DesktopEvents, IpcRequests } from '../shared/types'
+import { productionCSP, validateArguments } from './security'
 import { zoomShortcut } from '../shared/shortcuts'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const developmentURL = process.env.ELECTRON_RENDERER_URL
-if (process.env.PDF_JUNKIE_USER_DATA)
-  app.setPath('userData', resolve(process.env.PDF_JUNKIE_USER_DATA))
+const developmentURL = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined
+const userDataOverride = process.env.MARGIN_PDF_USER_DATA ?? process.env.PDF_JUNKIE_USER_DATA
+if (userDataOverride) app.setPath('userData', resolve(userDataOverride))
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'app',
@@ -33,13 +36,36 @@ protocol.registerSchemesAsPrivileged([
     },
   },
 ])
-app.setName('PDF Junkie')
+app.setName('Margin PDF')
+
+// Reuse an existing profile so the rename preserves papers, positions and preferences.
+if (!userDataOverride && !existsSync(join(app.getPath('userData'), 'reader-state.json'))) {
+  const legacyProfile = ['PDF Junkie', 'pdf-junkie']
+    .map((name) => join(app.getPath('appData'), name))
+    .find((directory) => existsSync(join(directory, 'reader-state.json')))
+  if (legacyProfile) app.setPath('userData', legacyProfile)
+}
 
 let window: BrowserWindow | null = null
 let store: ReaderStore
 let rendererReady = false
 let closing = false
 let quitting = false
+let safeMode = process.argv.includes('--safe-mode')
+let compact = process.argv.includes('--compact')
+
+function setCompact(value: boolean) {
+  compact = value
+  const item = Menu.getApplicationMenu()?.getMenuItemById('compact-mode')
+  if (item) item.checked = value
+  send('compact-mode', value)
+}
+let nativePrinting = false
+let draining = false
+
+function send<K extends keyof DesktopEvents>(channel: K, value: DesktopEvents[K]) {
+  window?.webContents.send(channel, value)
+}
 const nativePath = (value: string) => (/^file:/i.test(value) ? fileURLToPath(value) : value)
 const isPdfArgument = (value: string) => {
   try {
@@ -52,11 +78,11 @@ let pendingPaths = process.argv.slice(app.isPackaged ? 1 : 2).filter(isPdfArgume
 
 async function openPaths(paths: string[]) {
   const descriptors = []
-  for (const path of paths.slice(0, 100)) {
+  for (const path of paths) {
     try {
       descriptors.push(await store.register(nativePath(path)))
     } catch (error) {
-      window?.webContents.send(
+      send(
         'open-error',
         `Could not open ${path.split(/[\\/]/).at(-1)}: ${(error as Error).message}`,
       )
@@ -65,12 +91,25 @@ async function openPaths(paths: string[]) {
   return descriptors
 }
 
-function deliverPaths(paths: string[]) {
-  if (!rendererReady || !store) {
-    pendingPaths.push(...paths)
-    return
+async function drainPaths() {
+  if (!rendererReady || draining) return
+  draining = true
+  try {
+    while (rendererReady && pendingPaths.length) {
+      const paths = pendingPaths.splice(0)
+      const files = await openPaths(paths)
+      if (rendererReady) send('files-opened', files)
+      else pendingPaths.unshift(...paths)
+    }
+  } finally {
+    draining = false
   }
-  void openPaths(paths).then((files) => window?.webContents.send('files-opened', files))
+}
+
+function deliverPaths(paths: string[]) {
+  pendingPaths.push(...paths)
+  if (!rendererReady || !store) return
+  void drainPaths()
   window?.show()
   window?.focus()
 }
@@ -82,12 +121,22 @@ app.on('open-file', (event, path) => {
 const locked = app.requestSingleInstanceLock()
 if (!locked) app.quit()
 else {
-  app.on('second-instance', (_event, argv) => deliverPaths(argv.filter(isPdfArgument)))
+  app.on('second-instance', (_event, argv) => {
+    if (argv.includes('--compact')) setCompact(true)
+    deliverPaths(argv.filter(isPdfArgument))
+  })
   void app.whenReady().then(async () => {
     store = new ReaderStore(join(app.getPath('userData'), 'reader-state.json'))
     await store.load()
+    const monitor = new DocumentMonitor(
+      (id) => store.inspect(id),
+      (change) => {
+        send('document-changed', change)
+      },
+    )
+    app.on('will-quit', () => monitor.stop())
     const assetRoot = resolve(here, '../renderer')
-    protocol.handle('app', (request) => {
+    protocol.handle('app', async (request) => {
       try {
         const url = new URL(request.url)
         if (url.host !== 'reader') return new Response('Not found', { status: 404 })
@@ -96,7 +145,10 @@ else {
         const relation = relative(assetRoot, file)
         if (relation.startsWith('..') || relation.includes('\0'))
           return new Response('Forbidden', { status: 403 })
-        return net.fetch(pathToFileURL(file).toString())
+        const response = await net.fetch(pathToFileURL(file).toString())
+        const headers = new Headers(response.headers)
+        headers.set('Content-Security-Policy', productionCSP)
+        return new Response(response.body, { status: response.status, headers })
       } catch {
         return new Response('Not found', { status: 404 })
       }
@@ -105,7 +157,14 @@ else {
       callback(false),
     )
 
-    const handle = (name: string, callback: (...args: any[]) => unknown) => {
+    session.defaultSession.setPermissionCheckHandler(() => false)
+
+    const handle = <K extends keyof IpcRequests>(
+      name: K,
+      callback: (
+        ...args: IpcRequests[K]['args']
+      ) => IpcRequests[K]['result'] | Promise<IpcRequests[K]['result']>,
+    ) => {
       ipcMain.handle(name, (event, ...args) => {
         const source = event.senderFrame?.url ?? ''
         const allowed =
@@ -117,22 +176,32 @@ else {
           !allowed
         )
           throw new Error('Untrusted application request')
-        return callback(...args)
+        validateArguments(name, args)
+        return callback(...(args as IpcRequests[K]['args']))
       })
     }
     handle('bootstrap', async () => {
-      const paths = pendingPaths
-      pendingPaths = []
+      rendererReady = false
+      monitor.stop()
+      const paths = pendingPaths.splice(0)
       const launchFiles = await openPaths(paths)
-      rendererReady = true
       return {
         recent: await store.recent(),
         launchFiles,
-        session: store.session,
+        session: safeMode ? { ...store.session, tabs: [], activeDocumentId: null } : store.session,
         systemDark: nativeTheme.shouldUseDarkColors,
         platform: process.platform,
+        safeMode,
+        compact,
       }
     })
+    handle('renderer-ready', () => {
+      rendererReady = true
+      send('compact-mode', compact)
+      void drainPaths()
+    })
+    handle('restart', (safe) => restart(safe))
+    handle('set-compact', setCompact)
     handle('choose-files', async () => {
       const result = await dialog.showOpenDialog(window!, {
         title: 'Open papers',
@@ -155,6 +224,7 @@ else {
     })
     handle('reopen', (id: string) => store.reopen(id))
     handle('read-document', (id: string) => store.read(id))
+    handle('watch-documents', (documents) => monitor.setDocuments(documents))
     handle('save-session', (snapshot: unknown) => store.saveSession(snapshot))
     handle('ready-to-close', async (snapshot: unknown) => {
       await store.saveSession(snapshot)
@@ -162,7 +232,7 @@ else {
       if (quitting) app.quit()
       else window?.close()
     })
-    handle('clear-recent', () => store.clearRecent())
+    handle('clear-recent', (snapshot) => store.clearRecent(snapshot))
     handle('open-external', async (value: unknown) => {
       if (typeof value !== 'string' || value.length > 8192) throw new Error('Invalid link')
       const url = new URL(value)
@@ -170,19 +240,23 @@ else {
         throw new Error('This link type is not supported.')
       await shell.openExternal(url.toString())
     })
-    handle(
-      'print',
-      () =>
-        new Promise((resolvePrint) => {
+    handle('print', async () => {
+      if (nativePrinting) return { success: false, reason: 'A print job is already active.' }
+      nativePrinting = true
+      try {
+        return await new Promise<{ success: boolean; reason?: string }>((resolvePrint) => {
           window!.webContents.print(
             { silent: false, printBackground: true },
             (success, failureReason) => resolvePrint({ success, reason: failureReason }),
           )
-        }),
-    )
+        })
+      } finally {
+        nativePrinting = false
+      }
+    })
     handle('toggle-fullscreen', () => window?.setFullScreen(!window.isFullScreen()))
 
-    const command = (value: AppCommand) => () => window?.webContents.send('app-command', value)
+    const command = (value: AppCommand) => () => send('app-command', value)
     Menu.setApplicationMenu(
       Menu.buildFromTemplate([
         ...(process.platform === 'darwin' ? [{ role: 'appMenu' as const }] : []),
@@ -201,6 +275,15 @@ else {
         {
           label: 'View',
           submenu: [
+            { label: 'Options…', accelerator: 'CmdOrCtrl+,', click: command('options') },
+            {
+              id: 'compact-mode',
+              label: 'Compact layout',
+              type: 'checkbox',
+              checked: compact,
+              click: (item) => setCompact(item.checked),
+            },
+            { type: 'separator' },
             { label: 'Find in paper', accelerator: 'CmdOrCtrl+F', click: command('find') },
             { label: 'Zoom in', accelerator: 'CmdOrCtrl+Plus', click: command('zoom-in') },
             { label: 'Zoom out', accelerator: 'CmdOrCtrl+-', click: command('zoom-out') },
@@ -209,6 +292,7 @@ else {
             { label: 'Split view', accelerator: 'CmdOrCtrl+\\', click: command('split') },
             { type: 'separator' },
             { role: 'togglefullscreen' },
+            { label: 'Reopen without restoring documents', click: () => restart(true) },
             ...(!app.isPackaged ? [{ role: 'toggleDevTools' as const }] : []),
           ],
         },
@@ -228,6 +312,54 @@ else {
       ]),
     )
 
+    function restart(safe: boolean, replace = false) {
+      safeMode = safe
+      rendererReady = false
+      nativePrinting = false
+      if (window && (replace || window.webContents.isCrashed())) {
+        const previous = window
+        createWindow()
+        previous.destroy()
+      } else window?.webContents.reload()
+    }
+
+    let recovering = false
+    async function offerRecovery(unresponsive = false) {
+      rendererReady = false
+      nativePrinting = false
+      if (!window || recovering) return
+      recovering = true
+      try {
+        const { response } = await dialog.showMessageBox(window, {
+          type: 'warning',
+          title: 'Recover Margin PDF',
+          message: unresponsive
+            ? 'The reader is not responding.'
+            : 'The reader stopped unexpectedly.',
+          detail:
+            'Reopen safely to start without restoring documents. Saved reading positions remain available.',
+          buttons: unresponsive
+            ? ['Reopen safely', 'Keep waiting', 'Close']
+            : ['Reopen safely', 'Restore documents', 'Close'],
+          defaultId: 0,
+          cancelId: 2,
+          noLink: true,
+        })
+        if (!window) return
+        if (response === 0) restart(true, true)
+        else if (response === 1 && !unresponsive) restart(false, true)
+        else if (response === 2) {
+          closing = true
+          window.close()
+        } else {
+          rendererReady = true
+          void drainPaths()
+        }
+      } finally {
+        recovering = false
+      }
+    }
+
     function createWindow() {
       rendererReady = false
       closing = false
@@ -237,10 +369,10 @@ else {
         minWidth: 760,
         minHeight: 560,
         show: false,
-        title: 'PDF Junkie',
+        title: 'Margin PDF',
         backgroundColor: nativeTheme.shouldUseDarkColors ? '#171b22' : '#f4f5f7',
         autoHideMenuBar: process.platform !== 'darwin',
-        icon: join(here, '../../resources/icon.png'),
+        icon: join(here, '../../resources/margin-pdf-icon.png'),
         webPreferences: {
           preload: join(here, '../preload/index.cjs'),
           nodeIntegration: false,
@@ -249,6 +381,14 @@ else {
           webSecurity: true,
           spellcheck: false,
         },
+      })
+      const createdWindow = window
+      window.webContents.on('render-process-gone', (_event, details) => {
+        if (window === createdWindow && details.reason !== 'clean-exit' && !closing)
+          void offerRecovery()
+      })
+      window.on('unresponsive', () => {
+        if (window === createdWindow) void offerRecovery(true)
       })
       window.webContents.on('before-input-event', (event, input) => {
         if (input.type !== 'keyDown') return
@@ -266,7 +406,7 @@ else {
         if (!shortcut) return
         // Consume the key before menu/browser handling so each press zooms the PDF once.
         event.preventDefault()
-        window?.webContents.send('app-command', shortcut)
+        send('app-command', shortcut)
       })
       window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
       window.webContents.on('will-navigate', (event) => event.preventDefault())
@@ -274,9 +414,9 @@ else {
       window.on('close', (event) => {
         if (!rendererReady || closing) return
         event.preventDefault()
-        window?.webContents.send('prepare-close')
+        send('prepare-close', undefined)
         setTimeout(() => {
-          if (window && !closing) {
+          if (window === createdWindow && !closing) {
             closing = true
             if (quitting) app.quit()
             else window.close()
@@ -284,6 +424,8 @@ else {
         }, 3000).unref()
       })
       window.on('closed', () => {
+        if (window !== createdWindow) return
+        monitor.stop()
         window = null
         rendererReady = false
       })
@@ -291,9 +433,7 @@ else {
       else void window.loadURL('app://reader/index.html')
     }
     createWindow()
-    nativeTheme.on('updated', () =>
-      window?.webContents.send('system-theme', nativeTheme.shouldUseDarkColors),
-    )
+    nativeTheme.on('updated', () => send('system-theme', nativeTheme.shouldUseDarkColors))
     app.on('activate', () => {
       if (!window) createWindow()
       else window.show()

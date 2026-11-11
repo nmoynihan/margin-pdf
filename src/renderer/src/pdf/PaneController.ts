@@ -5,10 +5,14 @@ import {
   PDFLinkService,
   PDFFindController,
 } from 'pdfjs-dist/web/pdf_viewer.mjs'
+import { MAX_CANVAS_DIMENSION } from '../../../shared/limits'
 import type { ReadingPosition } from '../../../shared/types'
 import { NavigationHistory } from '../model/navigation'
 import type { Destination, ResolvedDestination } from './destinations'
 import type { LoadedDocument } from './engine'
+import { readerHost } from '../host'
+import type { SyncTarget } from '../../../shared/reader-host'
+import { pagePointFromClient, pdfPointFromTopLeft, viewportRectFromTarget } from './synctex'
 
 export interface PaneStatus {
   page: number
@@ -52,6 +56,9 @@ export class PaneController {
   private observer: ResizeObserver
   private resolveReady!: () => void
   private navigationRequest = 0
+  private syncMarker?: HTMLDivElement
+  private syncTimer?: ReturnType<typeof setTimeout>
+  private syncRequest = 0
 
   constructor(
     readonly container: HTMLDivElement,
@@ -76,8 +83,11 @@ export class PaneController {
       annotationEditorMode: AnnotationEditorType.DISABLE,
       enableAutoLinking: false,
       maxCanvasPixels: 16_777_216,
+      maxCanvasDim: MAX_CANVAS_DIMENSION,
+      // Avoid temporary progress canvases surviving a zoom, tab swap or PDF reload.
+      minDurationToUpdateCanvas: 0,
       abortSignal: this.abort.signal,
-      imageResourcesPath: new URL('pdfjs/images/', document.baseURI).href,
+      imageResourcesPath: readerHost().assetUrl('images/'),
     }
     this.viewer = new PDFViewer(options)
     this.linkService.setViewer(this.viewer)
@@ -93,7 +103,7 @@ export class PaneController {
     )
     this.eventBus.on(
       'updateviewarea',
-      ({ location }: any) => {
+      ({ location }: { location: { pageNumber: number; left: number; top: number } }) => {
         if (this.disposed || !this.initialized || !container.clientWidth || !container.clientHeight)
           return
         this.position = {
@@ -109,7 +119,7 @@ export class PaneController {
     )
     this.eventBus.on(
       'updatefindmatchescount',
-      ({ matchesCount }: any) => {
+      ({ matchesCount }: { matchesCount: PaneStatus['matches'] }) => {
         this.matches = matchesCount
         this.emit()
       },
@@ -117,7 +127,7 @@ export class PaneController {
     )
     this.eventBus.on(
       'updatefindcontrolstate',
-      ({ state, matchesCount }: any) => {
+      ({ state, matchesCount }: { state: number; matchesCount?: PaneStatus['matches'] }) => {
         this.finding = state === 3
         if (matchesCount) this.matches = matchesCount
         this.emit()
@@ -126,7 +136,7 @@ export class PaneController {
     )
     this.eventBus.on(
       'annotationlayerrendered',
-      ({ pageNumber }: any) => {
+      ({ pageNumber }: { pageNumber: number }) => {
         void this.indexAnnotations(pageNumber)
       },
       { signal: this.abort.signal },
@@ -233,7 +243,29 @@ export class PaneController {
   }
 
   private captureClick = (event: MouseEvent) => {
-    if (!(event.target as HTMLElement).closest('a')) return
+    if (!(event.target as HTMLElement).closest('a')) {
+      const host = readerHost()
+      if (!host.syncToSource || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey)
+        return
+      const element = (event.target as HTMLElement).closest<HTMLElement>('.page[data-page-number]')
+      if (!element || (event.target as HTMLElement).closest('input, button, select, textarea'))
+        return
+      const page = Number(element.dataset.pageNumber)
+      const view = this.viewer.getPageView(page - 1)
+      if (!view) return
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      const point = pagePointFromClient(
+        view.viewport,
+        element.getBoundingClientRect(),
+        event.clientX,
+        event.clientY,
+      )
+      void host
+        .syncToSource(this.loaded.descriptor.id, { page, ...point })
+        .catch((error) => this.onError(error.message))
+      return
+    }
     event.preventDefault()
     event.stopImmediatePropagation()
     const element = event.target as HTMLElement
@@ -242,7 +274,9 @@ export class PaneController {
         if (!target || this.disposed) return
         if (target.destination) this.onLink(target.destination, event.ctrlKey || event.metaKey)
         else if (target.url)
-          void window.desktop.openExternal(target.url).catch((error) => this.onError(error.message))
+          void readerHost()
+            .openExternal(target.url)
+            .catch((error) => this.onError(error.message))
         else if (target.action) {
           const page = {
             NextPage: this.viewer.currentPageNumber + 1,
@@ -282,6 +316,35 @@ export class PaneController {
       if (!this.disposed && request === this.navigationRequest)
         this.onError((error as Error).message)
     }
+  }
+
+  async syncTo(target: SyncTarget) {
+    const request = ++this.syncRequest
+    await this.ready
+    if (this.disposed || request !== this.syncRequest || target.page > this.loaded.pdf.numPages)
+      return
+    const page = await this.loaded.pdf.getPage(target.page)
+    if (this.disposed || request !== this.syncRequest) return
+    const [x, y] = pdfPointFromTopLeft(target.pageBox ?? page.view, target.x, target.y)
+    await this.navigate([target.page - 1, { name: 'XYZ' }, x, y, null])
+    if (this.disposed || request !== this.syncRequest) return
+    this.syncMarker?.remove()
+    clearTimeout(this.syncTimer)
+    const view = this.viewer.getPageView(target.page - 1)
+    if (!view) return
+    const rect = viewportRectFromTarget(view.viewport, target)
+    const marker = document.createElement('div')
+    marker.className = 'synctex-indicator'
+    marker.setAttribute('aria-hidden', 'true')
+    Object.assign(marker.style, {
+      left: `${rect.left}px`,
+      top: `${rect.top}px`,
+      width: `${rect.width}px`,
+      height: `${rect.height}px`,
+    })
+    view.div.append(marker)
+    this.syncMarker = marker
+    this.syncTimer = setTimeout(() => marker.remove(), 1800)
   }
 
   restore(position: ReadingPosition) {
@@ -337,15 +400,26 @@ export class PaneController {
     this.eventBus.dispatch('findbarclose', { source: this })
   }
   dispose() {
+    clearTimeout(this.syncTimer)
+    this.syncMarker?.remove()
     if (this.disposed) return
     this.disposed = true
     this.navigationRequest++
     this.resolveReady()
     this.observer.disconnect()
     this.abort.abort()
+    // PDF.js can finish a queued getPage after cancellation and try to resume
+    // its old page view. Retire this viewer's queue before cancelling its pages.
+    const queue = this.viewer.renderingQueue
+    if (queue) {
+      queue.renderView = () => false
+      queue.renderHighestPriority = () => {}
+    }
     this.viewer.setDocument(null)
     this.linkService.setDocument(null)
     this.annotationPages.clear()
-    this.container.replaceChildren()
+    // React owns the .pdfViewer wrapper. Keep it available when a refreshed PDF
+    // attaches a new controller to this pane; only PDF.js's page nodes are disposable.
+    this.container.firstElementChild?.replaceChildren()
   }
 }

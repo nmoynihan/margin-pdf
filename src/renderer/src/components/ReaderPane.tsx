@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   ArrowLeft,
   ArrowRight,
@@ -33,6 +34,8 @@ export function ReaderPane({
   onLeaveLink,
   onNavigation,
   onError,
+  toolbarTarget,
+  paneLabel,
 }: {
   pane: PaneSnapshot
   loaded: LoadedDocument
@@ -49,6 +52,8 @@ export function ReaderPane({
   onLeaveLink(): void
   onNavigation(): void
   onError(message: string): void
+  toolbarTarget?: HTMLElement | null
+  paneLabel?: string
 }) {
   const container = useRef<HTMLDivElement>(null)
   const controller = useRef<PaneController | null>(null)
@@ -103,15 +108,7 @@ export function ReaderPane({
     callbacks.current.onController(pane.id, view)
     const root = container.current!
     let hoverVersion = 0
-    const enter = (event: PointerEvent | FocusEvent) => {
-      const anchor = (event.target as HTMLElement).closest<HTMLAnchorElement>('a')
-      if (
-        !anchor ||
-        ('relatedTarget' in event &&
-          event.relatedTarget instanceof Node &&
-          anchor.contains(event.relatedTarget))
-      )
-        return
+    const requestPreview = (anchor: HTMLAnchorElement) => {
       const version = ++hoverVersion
       void view
         .targetFor(anchor)
@@ -122,9 +119,17 @@ export function ReaderPane({
             return
           }
           if (target.destination) {
+            anchor.setAttribute('aria-haspopup', 'dialog')
+            anchor.setAttribute('aria-controls', 'link-preview')
+            anchor.setAttribute('aria-keyshortcuts', 'Alt+ArrowDown')
+            anchor.setAttribute(
+              'aria-description',
+              'Press Alt+ArrowDown or Tab to enter the link preview.',
+            )
             const { left, top, right, bottom } = anchor.getBoundingClientRect()
             callbacks.current.onHover({
               sourceId: pane.id,
+              sourceElement: anchor,
               destination: target.destination,
               anchor: { left, top, right, bottom },
               rotation: view.status().rotation,
@@ -132,6 +137,18 @@ export function ReaderPane({
           }
         })
         .catch(() => {})
+    }
+    const enter = (event: PointerEvent | FocusEvent) => {
+      const anchor = (event.target as HTMLElement).closest<HTMLAnchorElement>('a')
+      if (
+        !anchor ||
+        anchor.dataset.previewReturning ||
+        ('relatedTarget' in event &&
+          event.relatedTarget instanceof Node &&
+          anchor.contains(event.relatedTarget))
+      )
+        return
+      requestPreview(anchor)
     }
     const leave = (event: PointerEvent | FocusEvent) => {
       const anchor = (event.target as HTMLElement).closest('a')
@@ -146,7 +163,18 @@ export function ReaderPane({
     let scrollFrame = 0
     const scroll = () => {
       cancelAnimationFrame(scrollFrame)
-      scrollFrame = requestAnimationFrame(() => callbacks.current.onNavigation())
+      scrollFrame = requestAnimationFrame(() => {
+        // Focusing a PDF link can scroll it into view; preserve that keyboard preview.
+        if (
+          root.contains(document.activeElement) &&
+          document.activeElement?.closest('.linkAnnotation a')
+        )
+          return
+        callbacks.current.onNavigation()
+        // Scrolling to a pointer-hovered link can precede its final pointerover event.
+        const hovered = root.querySelector<HTMLAnchorElement>('.linkAnnotation a:hover')
+        if (hovered) requestPreview(hovered)
+      })
     }
     root.addEventListener('pointerover', enter)
     root.addEventListener('pointerout', leave)
@@ -176,7 +204,7 @@ export function ReaderPane({
   }, [active, findOpen])
   useEffect(() => {
     if (findOpen) controller.current?.find(query, false, false, caseSensitive)
-  }, [query, caseSensitive, findOpen])
+  }, [query, caseSensitive, findOpen, loaded])
   const goToInputPage = () => {
     if (!pageDirty.current) return
     pageDirty.current = false
@@ -186,6 +214,80 @@ export function ReaderPane({
     setPageInput(loaded.labels?.[status.page - 1] ?? String(status.page))
   }
 
+  const toolbar = (
+    <div className="pane-toolbar">
+      <div className="pane-history">
+        <IconButton
+          icon={ArrowLeft}
+          label="Back"
+          disabled={!status.back}
+          onClick={() => controller.current?.goBack()}
+        />
+        <IconButton
+          icon={ArrowRight}
+          label="Forward"
+          disabled={!status.forward}
+          onClick={() => controller.current?.goForward()}
+        />
+      </div>
+      <div className="page-control">
+        <input
+          aria-label="Page number"
+          value={pageInput}
+          onChange={(event) => {
+            pageDirty.current = true
+            setPageInput(event.target.value)
+          }}
+          onBlur={goToInputPage}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              goToInputPage()
+              event.currentTarget.blur()
+            }
+          }}
+        />
+        <span>/ {status.count}</span>
+      </div>
+      <span className="toolbar-divider" />
+      <IconButton
+        icon={Minus}
+        label="Zoom out"
+        onClick={() => controller.current?.zoomBy(1 / 1.2)}
+      />
+      <select
+        aria-label="Zoom"
+        value={['page-width', 'page-fit', 'auto'].includes(status.zoom) ? status.zoom : 'custom'}
+        onChange={(event) => controller.current?.zoom(event.target.value)}
+      >
+        <option value="page-width">Fit width</option>
+        <option value="page-fit">Fit page</option>
+        <option value="auto">Automatic</option>
+        <option value="custom" disabled>
+          {Math.round(status.scale * 100)}%
+        </option>
+        {[0.5, 0.75, 1, 1.25, 1.5, 2, 3].map((value) => (
+          <option key={value} value={String(value)}>
+            {value * 100}%
+          </option>
+        ))}
+      </select>
+      <IconButton icon={Plus} label="Zoom in" onClick={() => controller.current?.zoomBy(1.2)} />
+      <IconButton
+        icon={RotateCw}
+        label="Rotate clockwise"
+        className="rotation-button"
+        onClick={() => controller.current?.rotate()}
+      />
+      <span className="pane-toolbar-spacer" />
+      {split && (
+        <>
+          <span className="pane-label">{paneLabel ?? (active ? 'ACTIVE' : 'REFERENCE')}</span>
+          <IconButton icon={X} label="Close pane" onClick={onClose} />
+        </>
+      )}
+    </div>
+  )
+
   return (
     <section
       className={`reader-pane${active ? ' active-pane' : ''}`}
@@ -194,77 +296,9 @@ export function ReaderPane({
       onPointerDown={onFocus}
       onFocusCapture={onFocus}
     >
-      <div className="pane-toolbar">
-        <div className="pane-history">
-          <IconButton
-            icon={ArrowLeft}
-            label="Back"
-            disabled={!status.back}
-            onClick={() => controller.current?.goBack()}
-          />
-          <IconButton
-            icon={ArrowRight}
-            label="Forward"
-            disabled={!status.forward}
-            onClick={() => controller.current?.goForward()}
-          />
-        </div>
-        <div className="page-control">
-          <input
-            aria-label="Page number"
-            value={pageInput}
-            onChange={(event) => {
-              pageDirty.current = true
-              setPageInput(event.target.value)
-            }}
-            onBlur={goToInputPage}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                goToInputPage()
-                event.currentTarget.blur()
-              }
-            }}
-          />
-          <span>/ {status.count}</span>
-        </div>
-        <span className="toolbar-divider" />
-        <IconButton
-          icon={Minus}
-          label="Zoom out"
-          onClick={() => controller.current?.zoomBy(1 / 1.2)}
-        />
-        <select
-          aria-label="Zoom"
-          value={['page-width', 'page-fit', 'auto'].includes(status.zoom) ? status.zoom : 'custom'}
-          onChange={(event) => controller.current?.zoom(event.target.value)}
-        >
-          <option value="page-width">Fit width</option>
-          <option value="page-fit">Fit page</option>
-          <option value="auto">Automatic</option>
-          <option value="custom" disabled>
-            {Math.round(status.scale * 100)}%
-          </option>
-          {[0.5, 0.75, 1, 1.25, 1.5, 2, 3].map((value) => (
-            <option key={value} value={String(value)}>
-              {value * 100}%
-            </option>
-          ))}
-        </select>
-        <IconButton icon={Plus} label="Zoom in" onClick={() => controller.current?.zoomBy(1.2)} />
-        <IconButton
-          icon={RotateCw}
-          label="Rotate clockwise"
-          className="rotation-button"
-          onClick={() => controller.current?.rotate()}
-        />
-        <span className="pane-toolbar-spacer" />
-        {split && (
-          <>
-            <span className="pane-label">{active ? 'ACTIVE' : 'REFERENCE'}</span>
-            <IconButton icon={X} label="Close pane" onClick={onClose} />
-          </>
-        )}
-      </div>
+      {toolbarTarget === undefined
+        ? toolbar
+        : active && toolbarTarget && createPortal(toolbar, toolbarTarget)}
       {findOpen && (
         <div className="find-bar">
           <Search size={15} />

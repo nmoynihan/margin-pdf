@@ -6,3 +6,9 @@ tests/fixtures/
 test-results/
 playwright-report/
 package-lock.json
+
+extensions/vscode/dist/
+extensions/vscode/*.vsix
+.vscode-test/
+
+extensions/chrome/dist/

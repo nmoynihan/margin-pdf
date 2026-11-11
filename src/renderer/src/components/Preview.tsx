@@ -7,10 +7,12 @@ import type { LoadedDocument } from '../pdf/engine'
 import type { Destination, ResolvedDestination } from '../pdf/destinations'
 import { previewPoint } from '../pdf/destinations'
 import { placePreview } from '../model/navigation'
+import { MAX_CANVAS_DIMENSION } from '../../../shared/limits'
 import { IconButton } from './Controls'
 
 export interface PreviewRequest {
   sourceId: string
+  sourceElement: HTMLElement
   destination: Destination
   anchor: { left: number; top: number; right: number; bottom: number }
   rotation: number
@@ -80,6 +82,7 @@ export function Preview({
         enableDetailCanvas: false,
         enableAutoLinking: false,
         maxCanvasPixels: 8_388_608,
+        maxCanvasDim: MAX_CANVAS_DIMENSION,
       })
       pageView.setPdfPage(page)
       pageView.update({ rotation: request.rotation })
@@ -102,11 +105,30 @@ export function Preview({
   return createPortal(
     <aside
       className="link-preview"
+      id="link-preview"
       role="dialog"
       aria-label="Link preview"
       style={bounds}
       onPointerEnter={onEnter}
       onPointerLeave={onLeave}
+      onFocusCapture={onEnter}
+      onBlurCapture={(event) => {
+        if (!(
+          event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)
+        ))
+          onLeave()
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Tab') return
+        const controls = Array.from(
+          event.currentTarget.querySelectorAll<HTMLElement>(
+            '.preview-heading button, .preview-viewport, .preview-footer button:not(:disabled)',
+          ),
+        )
+        const index = controls.indexOf(document.activeElement as HTMLElement)
+        event.preventDefault()
+        controls[(index + (event.shiftKey ? -1 : 1) + controls.length) % controls.length]?.focus()
+      }}
     >
       <div className="preview-heading">
         <span>
@@ -119,7 +141,13 @@ export function Preview({
         </span>
         <IconButton icon={X} label="Close preview" onClick={onClose} />
       </div>
-      <div ref={viewport} className="preview-viewport" onWheel={(event) => event.stopPropagation()}>
+      <div
+        ref={viewport}
+        tabIndex={0}
+        aria-label="Preview pages"
+        className="preview-viewport"
+        onWheel={(event) => event.stopPropagation()}
+      >
         <div ref={host} className="pdfViewer preview-page-host" />
         {!ready && !error && (
           <div className="preview-message">

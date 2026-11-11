@@ -1,0 +1,107 @@
+{
+  "name": "margin-pdf-reader",
+  "displayName": "Margin PDF",
+  "description": "Academic PDF reading with link previews, independent split panes, and bidirectional SyncTeX.",
+  "version": "0.1.0",
+  "publisher": "margin-pdf",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.145.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "main": "./dist/extension.cjs",
+  "extensionKind": [
+    "ui"
+  ],
+  "activationEvents": [
+    "onCustomEditor:marginPdf.reader"
+  ],
+  "capabilities": {
+    "virtualWorkspaces": false,
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "PDF reading is available. SyncTeX requires a trusted local workspace."
+    }
+  },
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "marginPdf.reader",
+        "displayName": "Margin PDF",
+        "selector": [
+          {
+            "filenamePattern": "*.pdf"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
+    "commands": [
+      {
+        "command": "marginPdf.openBeside",
+        "title": "Margin PDF: Open PDF Beside Source",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "marginPdf.syncFromCursor",
+        "title": "Margin PDF: Sync PDF from Cursor",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "marginPdf.selectPdf",
+        "title": "Margin PDF: Associate Source with PDF"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "marginPdf.openBeside",
+          "when": "resourceLangId == latex || resourceExtname == .pdf",
+          "group": "navigation@10"
+        },
+        {
+          "command": "marginPdf.syncFromCursor",
+          "when": "resourceLangId == latex",
+          "group": "navigation@11"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "marginPdf.openBeside",
+          "when": "resourceExtname == .pdf || resourceExtname == .tex",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Margin PDF",
+      "properties": {
+        "marginPdf.synctexPath": {
+          "type": "string",
+          "default": "synctex",
+          "scope": "machine",
+          "description": "Path to the local SyncTeX executable. Arguments are supplied by Margin PDF."
+        },
+        "marginPdf.synctexDirectory": {
+          "type": "string",
+          "default": "",
+          "scope": "resource",
+          "description": "Optional directory containing SyncTeX data, relative to the source root directory or absolute."
+        }
+      }
+    }
+  },
+  "homepage": "https://github.com/nmoynihan/margin-pdf",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nmoynihan/margin-pdf.git",
+    "directory": "extensions/vscode"
+  },
+  "bugs": {
+    "url": "https://github.com/nmoynihan/margin-pdf/issues"
+  },
+  "icon": "icon.png"
+}

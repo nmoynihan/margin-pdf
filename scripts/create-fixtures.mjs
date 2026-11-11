@@ -7,7 +7,7 @@ await mkdir('tests/fixtures', { recursive: true })
 await mkdir('src/renderer/public', { recursive: true })
 const pdf = await PDFDocument.create()
 pdf.setTitle('Reading without losing the thread')
-pdf.setAuthor('PDF Junkie • Sample paper')
+pdf.setAuthor('Margin PDF • Sample paper')
 pdf.setSubject(
   'An interactive sample document, with fictional references, for testing PDF navigation.',
 )
@@ -60,7 +60,7 @@ function link(page, label, x, y, destination, external = false) {
   page.node.addAnnot(annotation)
 }
 for (const [index, page] of pages.entries()) {
-  text(page, 'PDF JUNKIE   /   INTERACTIVE SAMPLE', 55, 795, 8, sans, muted)
+  text(page, 'MARGIN PDF   /   INTERACTIVE SAMPLE', 55, 795, 8, sans, muted)
   page.drawLine({
     start: { x: 55, y: 782 },
     end: { x: 540, y: 782 },
@@ -74,7 +74,7 @@ const intro = pages[0]
 text(intro, 'Reading without losing', 55, 725, 27, bold)
 text(intro, 'the thread', 55, 691, 27, bold)
 text(intro, 'A small study in following references', 55, 660, 13, italic, muted)
-text(intro, 'PDF Junkie   |   Reader experience notes   |   2026', 55, 631, 9, sans, muted)
+text(intro, 'Margin PDF   |   Reader experience notes   |   2026', 55, 631, 9, sans, muted)
 heading(intro, 'Abstract', 587)
 paragraph(
   intro,
@@ -324,7 +324,7 @@ function rc4(key, input) {
   )
 }
 const owner = rc4(md5(pad('owner')).subarray(0, 5), pad('read'))
-const identifier = md5(Buffer.from('pdf-junkie-fixture'))
+const identifier = md5(Buffer.from('margin-pdf-fixture'))
 const permissions = Buffer.alloc(4)
 permissions.writeInt32LE(-4)
 const key = md5(Buffer.concat([pad('read'), owner, permissions, identifier])).subarray(0, 5)

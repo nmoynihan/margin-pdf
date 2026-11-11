@@ -1,4 +1,5 @@
-import type { ButtonHTMLAttributes, ComponentType } from 'react'
+import type { ButtonHTMLAttributes, ComponentType, CSSProperties } from 'react'
+import marginMark from '../../../../resources/branding/margin-pdf-mark.png'
 
 type Icon = ComponentType<{ size?: number; strokeWidth?: number; 'aria-hidden'?: boolean }>
 export function IconButton({
@@ -24,28 +25,12 @@ export function IconButton({
 
 export function Brand({ small = false }: { small?: boolean }) {
   return (
-    <span className={`brand-mark${small ? ' small' : ''}`} aria-hidden="true">
-      <svg viewBox="0 0 36 36" fill="none">
-        <path
-          d="M10 7h11l6 6v16H10V7Z"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M21 7v7h6M14 19h9M14 23h7"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-        />
-        <path
-          d="M6 11v21h17"
-          stroke="currentColor"
-          strokeWidth="1.3"
-          strokeLinecap="round"
-          opacity=".55"
-        />
-      </svg>
+    <span
+      className={`brand-mark${small ? ' small' : ''}`}
+      aria-hidden="true"
+      style={{ '--brand-image': `url("${marginMark}")` } as CSSProperties}
+    >
+      <span className="brand-glyph" />
     </span>
   )
 }

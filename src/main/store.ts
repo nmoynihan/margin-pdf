@@ -1,8 +1,9 @@
-import { readFile, writeFile, mkdir, rename, realpath, stat } from 'node:fs/promises'
-import { dirname, basename, extname, join } from 'node:path'
+import { readFile, writeFile, mkdir, rename, realpath } from 'node:fs/promises'
+import { dirname, extname, join } from 'node:path'
 import { createHash } from 'node:crypto'
 import { sanitizeSession } from '../shared/session'
 import { emptySession, type DocumentDescriptor, type SessionSnapshot } from '../shared/types'
+import { describePdf, readPdf } from '../shared/pdf-file'
 
 interface FileRecord {
   id: string
@@ -38,15 +39,7 @@ export class ReaderStore {
   }
 
   private async describe(record: FileRecord): Promise<DocumentDescriptor> {
-    const info = await stat(record.path)
-    if (!info.isFile()) throw new Error('This PDF is no longer available.')
-    return {
-      id: record.id,
-      name: basename(record.path),
-      location: basename(dirname(record.path)),
-      size: info.size,
-      modified: info.mtimeMs,
-    }
+    return describePdf(record.path, record.id)
   }
 
   async register(path: string) {
@@ -71,10 +64,18 @@ export class ReaderStore {
     return descriptor
   }
 
+  async inspect(id: string) {
+    const record = this.files.get(id)
+    if (!record) throw new Error('This document is no longer registered.')
+    return this.describe(record)
+  }
+
   async read(id: string) {
     const record = this.files.get(id)
     if (!record) throw new Error('Unknown document. Open the PDF first.')
-    return new Uint8Array(await readFile(record.path))
+    const data = await readPdf(record.path)
+    if (!this.files.has(id)) throw new Error('Document access was cleared.')
+    return data
   }
 
   async recent() {
@@ -86,7 +87,8 @@ export class ReaderStore {
     return results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []))
   }
 
-  async clearRecent() {
+  async clearRecent(snapshot: unknown) {
+    this.session = sanitizeSession(snapshot)
     const keep = new Set(this.session.tabs.map((tab) => tab.documentId))
     for (const [id, record] of this.files) {
       if (keep.has(id)) record.lastOpened = 0
@@ -103,7 +105,11 @@ export class ReaderStore {
   persist() {
     const active = new Set(this.session.tabs.map((tab) => tab.documentId))
     const sorted = [...this.files.values()].sort((a, b) => b.lastOpened - a.lastOpened)
-    const keep = sorted.filter((file, index) => index < 100 || active.has(file.id))
+    const keep = sorted.filter(
+      (file, index) => (file.lastOpened > 0 && index < 100) || active.has(file.id),
+    )
+    const retained = new Set(keep.map((file) => file.id))
+    for (const id of this.files.keys()) if (!retained.has(id)) this.files.delete(id)
     const contents = JSON.stringify({
       version: 1,
       files: keep,

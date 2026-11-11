@@ -1,20 +1,27 @@
-appId: dev.pdfjunkie.reader
-productName: PDF Junkie
+appId: dev.marginpdf.reader
+productName: Margin PDF
 directories:
   output: dist
   buildResources: resources
 files:
   - out/**
   - package.json
-  - resources/icon.png
+  - resources/margin-pdf-icon.png
 asar: true
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  grantFileProtocolExtraPrivileges: false
 fileAssociations:
   - ext: pdf
     name: PDF document
     mimeType: application/pdf
     role: Viewer
 win:
-  icon: resources/icon.ico
+  icon: resources/margin-pdf-icon.ico
   target:
     - target: nsis
       arch: [x64]
@@ -23,15 +30,17 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
 mac:
-  icon: resources/icon.icns
+  icon: resources/margin-pdf-icon.icns
   category: public.app-category.productivity
-  identity: null
+  hardenedRuntime: true
+  entitlements: resources/entitlements.mac.plist
+  entitlementsInherit: resources/entitlements.mac.plist
   target:
     - target: dmg
       arch: [x64, arm64]
 linux:
   syncDesktopName: true
-  icon: resources/icon.png
+  icon: resources/margin-pdf-icon.png
   category: Office
   synopsis: A focused academic PDF reader
   target:
@@ -39,3 +48,38 @@ linux:
       arch: [x64]
     - target: deb
       arch: [x64]
+    - target: pacman
+      arch: [x64]
+pacman:
+  artifactName: ${name}-${version}-1-x86_64.pkg.tar.zst
+  compression: zstd
+  fpm:
+    - --iteration=1
+    # Pacman's PKGINFO requires a single-line description.
+    - --description=A focused academic PDF reader with link previews and independent split panes.
+  # Electron bundles its own codecs; these are its host runtime libraries.
+  depends:
+    - alsa-lib
+    - at-spi2-core
+    - cairo
+    - dbus
+    - expat
+    - glib2
+    - glibc
+    - gtk3
+    - libcups
+    - libdrm
+    - libx11
+    - libxcb
+    - libxcomposite
+    - libxdamage
+    - libxext
+    - libxfixes
+    - libxkbcommon
+    - libxrandr
+    - mesa
+    - nspr
+    - nss
+    - pango
+    - systemd-libs
+    - xdg-utils

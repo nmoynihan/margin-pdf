@@ -1,8 +1,17 @@
+import { readerHost } from '../host'
 import { useEffect, useRef, useState } from 'react'
-import { ChevronRight, ExternalLink, ListTree, Grid2X2 } from 'lucide-react'
+import {
+  ChevronRight,
+  ExternalLink,
+  ListTree,
+  Grid2X2,
+  PanelLeftClose,
+  PanelRightClose,
+} from 'lucide-react'
 import type { LoadedDocument } from '../pdf/engine'
 import type { Destination } from '../pdf/destinations'
 import type { PreviewRequest } from './Preview'
+import { MAX_PAGE_PIXELS, MAX_CANVAS_DIMENSION } from '../../../shared/limits'
 import { IconButton } from './Controls'
 
 function Thumbnail({
@@ -41,7 +50,13 @@ function Thumbnail({
       .getPage(pageNumber)
       .then(async (page) => {
         if (stopped || !canvas.current) return
-        const viewport = page.getViewport({ scale: 144 / page.getViewport({ scale: 1 }).width })
+        const points = page.getViewport({ scale: 1 })
+        const scale = Math.min(
+          144 / points.width,
+          Math.sqrt(MAX_PAGE_PIXELS / (points.width * points.height)) / devicePixelRatio,
+          MAX_CANVAS_DIMENSION / Math.max(points.width, points.height) / devicePixelRatio,
+        )
+        const viewport = page.getViewport({ scale })
         const element = canvas.current
         element.width = Math.ceil(viewport.width * devicePixelRatio)
         element.height = Math.ceil(viewport.height * devicePixelRatio)
@@ -121,7 +136,7 @@ function OutlineItems({
               className="outline-entry"
               onClick={(event) => {
                 if (item.dest) onNavigate(item.dest, event.ctrlKey || event.metaKey)
-                else if (item.url) void window.desktop.openExternal(item.url)
+                else if (item.url) void readerHost().openExternal(item.url)
               }}
               onPointerEnter={(event) => item.dest && onHover(item.dest, event.currentTarget)}
               onPointerLeave={onLeave}
@@ -145,6 +160,8 @@ export function Sidebar({
   sourceId,
   rotation,
   onMode,
+  onCollapse,
+  position,
   onNavigate,
   onHover,
   onLeave,
@@ -155,12 +172,18 @@ export function Sidebar({
   sourceId: string
   rotation: number
   onMode(mode: 'outline' | 'thumbnails'): void
+  onCollapse(): void
+  position: 'left' | 'right' | 'overlay'
   onNavigate(destination: Destination, split: boolean): void
   onHover(request: PreviewRequest): void
   onLeave(): void
 }) {
   return (
-    <aside className="sidebar" aria-label="Document navigation">
+    <aside
+      className="sidebar"
+      id={`navigation-${loaded.descriptor.id}`}
+      aria-label="Document navigation"
+    >
       <div className="sidebar-header">
         <span>{mode === 'outline' ? 'CONTENTS' : 'PAGES'}</span>
         <div>
@@ -176,6 +199,11 @@ export function Sidebar({
             active={mode === 'thumbnails'}
             onClick={() => onMode('thumbnails')}
           />
+          <IconButton
+            icon={position === 'right' ? PanelRightClose : PanelLeftClose}
+            label="Collapse sidebar"
+            onClick={onCollapse}
+          />
         </div>
       </div>
       <div className="sidebar-scroll">
@@ -186,7 +214,20 @@ export function Sidebar({
               onNavigate={onNavigate}
               onHover={(destination, element) => {
                 const { left, right, top, bottom } = element.getBoundingClientRect()
-                onHover({ sourceId, destination, rotation, anchor: { left, right, top, bottom } })
+                element.setAttribute('aria-haspopup', 'dialog')
+                element.setAttribute('aria-controls', 'link-preview')
+                element.setAttribute('aria-keyshortcuts', 'Alt+ArrowDown')
+                element.setAttribute(
+                  'aria-description',
+                  'Press Alt+ArrowDown or Tab to enter the link preview.',
+                )
+                onHover({
+                  sourceId,
+                  sourceElement: element,
+                  destination,
+                  rotation,
+                  anchor: { left, right, top, bottom },
+                })
               }}
               onLeave={onLeave}
             />

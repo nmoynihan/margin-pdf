@@ -1,6 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import {
   PanelLeft,
+  PanelLeftOpen,
+  PanelRightOpen,
+  ListTree,
+  Grid2X2,
   Search,
   Columns2,
   Rows2,
@@ -9,7 +14,12 @@ import {
   LockKeyhole,
   FileWarning,
   ArrowRight,
+  RefreshCw,
+  Check,
+  Ellipsis,
 } from 'lucide-react'
+import { readerHost } from '../host'
+import type { SyncTarget } from '../../../shared/reader-host'
 import type {
   AppCommand,
   DocumentDescriptor,
@@ -21,7 +31,6 @@ import { startDocument, type LoadedDocument } from '../pdf/engine'
 import type { PaneController } from '../pdf/PaneController'
 import type { Destination, ResolvedDestination } from '../pdf/destinations'
 import { oppositePane } from '../model/navigation'
-import { preparePrint } from '../pdf/printing'
 import { ReaderPane } from './ReaderPane'
 import { Preview, type PreviewRequest } from './Preview'
 import { Sidebar } from './Sidebar'
@@ -42,27 +51,62 @@ export function DocumentTab({
   initial,
   active,
   sidebar,
+  sidebarPosition,
   onSidebar,
   onSnapshot,
   onTitle,
   onCommandHandler,
   onError,
   onClose,
+  onPrint,
+  printing,
+  fileError,
+  compact = false,
+  secondaryActions,
+  syncTarget,
+  reloadLabel = 'Reload PDF from disk',
+  toolbarTarget,
+  paneToolbarTarget,
 }: {
+  compact?: boolean
+  secondaryActions?: ReactNode
+  syncTarget?: SyncTarget
+  reloadLabel?: string
+  toolbarTarget?: HTMLElement | null
+  paneToolbarTarget?: HTMLElement | null
   descriptor: DocumentDescriptor
   initial: TabSnapshot
   active: boolean
   sidebar: 'outline' | 'thumbnails' | null
+  sidebarPosition: 'left' | 'right' | 'overlay'
   onSidebar(mode: 'outline' | 'thumbnails' | null): void
   onSnapshot(snapshot: TabSnapshot): void
   onTitle(title: string): void
   onCommandHandler(id: string, handler: ((command: AppCommand) => void) | null): void
   onError(message: string): void
   onClose(): void
+  onPrint(loaded: LoadedDocument): void
+  printing: boolean
+  fileError?: string
 }) {
+  const lastSidebar = useRef<'outline' | 'thumbnails'>(sidebar ?? 'outline')
+  const focusSidebar = useRef(false)
+  if (sidebar) lastSidebar.current = sidebar
+  useEffect(() => {
+    if (!focusSidebar.current) return
+    focusSidebar.current = false
+    const navigation = document.getElementById(`navigation-${descriptor.id}`)
+    navigation?.querySelector<HTMLButtonElement>(sidebar ? '.is-active' : 'button')?.focus()
+  }, [sidebar, descriptor.id])
   const [loaded, setLoaded] = useState<LoadedDocument | null>(null)
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
+  const [reloading, setReloading] = useState(false)
+  const [updateError, setUpdateError] = useState('')
+  const [updated, setUpdated] = useState(false)
+  const liveResource = useRef<LoadedDocument | null>(null)
+  const retiredResources = useRef<LoadedDocument[]>([])
+  const requested = useRef('')
   const [password, setPassword] = useState<{
     submit(value: string): void
     incorrect: boolean
@@ -80,15 +124,32 @@ export function DocumentTab({
   )
   const [findOpen, setFindOpen] = useState(false)
   const [preview, setPreview] = useState<PreviewRequest | null>(null)
+  const previewRef = useRef(preview)
+  const appliedSync = useRef(0)
+  previewRef.current = preview
+  const latestHover = useRef<PreviewRequest | null>(null)
+  const restoringFocus = useRef(false)
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const [printProgress, setPrintProgress] = useState<{
-    done: number
-    total: number
-    dialog: boolean
-  } | null>(null)
-  const printJob = useRef<AbortController | null>(null)
   const splitArea = useRef<HTMLDivElement>(null)
+  const [areaSize, setAreaSize] = useState({ width: 0, height: 0 })
+  const effectiveOrientation =
+    snapshot.orientation === 'horizontal' && areaSize.width > 0 && areaSize.width < 620
+      ? 'vertical'
+      : snapshot.orientation
+  const extent = effectiveOrientation === 'horizontal' ? areaSize.width : areaSize.height
+  const minimum = effectiveOrientation === 'horizontal' ? 280 : findOpen ? 150 : 110
+  const minRatio = extent > 0 ? Math.min(0.5, Math.max(0.2, (minimum + 6) / extent)) : 0.2
+  const effectiveRatio = Math.min(1 - minRatio, Math.max(minRatio, snapshot.ratio))
+  useEffect(() => {
+    const element = splitArea.current
+    if (!element) return
+    const observer = new ResizeObserver(([entry]) =>
+      setAreaSize({ width: entry.contentRect.width, height: entry.contentRect.height }),
+    )
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [loaded])
   const dragCleanup = useRef<(() => void) | undefined>(undefined)
 
   const commit = useCallback((next: TabSnapshot) => {
@@ -99,17 +160,51 @@ export function DocumentTab({
   const dismissPreview = useCallback(() => {
     clearTimeout(hoverTimer.current)
     clearTimeout(closeTimer.current)
+    const source = previewRef.current?.sourceElement
+    const returnFocus = document.activeElement?.closest('.link-preview')
+    previewRef.current = null
     setPreview(null)
+    if (returnFocus && source?.isConnected) {
+      restoringFocus.current = true
+      source.dataset.previewReturning = 'true'
+      source.focus({ preventScroll: true })
+      delete source.dataset.previewReturning
+      restoringFocus.current = false
+    }
   }, [])
   const hover = useCallback((request: PreviewRequest) => {
+    if (restoringFocus.current) return
+    latestHover.current = request
     clearTimeout(hoverTimer.current)
     clearTimeout(closeTimer.current)
     hoverTimer.current = setTimeout(() => setPreview(request), 300)
   }, [])
   const leave = useCallback(() => {
+    if (latestHover.current?.sourceElement === document.activeElement) return
     clearTimeout(hoverTimer.current)
     clearTimeout(closeTimer.current)
-    closeTimer.current = setTimeout(() => setPreview(null), 220)
+    closeTimer.current = setTimeout(() => {
+      if (
+        document.activeElement?.closest('.link-preview') ||
+        latestHover.current?.sourceElement === document.activeElement
+      )
+        return
+      setPreview(null)
+    }, 220)
+  }, [])
+
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      const request = previewRef.current
+      if (!request || document.activeElement !== request.sourceElement) return
+      if ((event.altKey && event.key === 'ArrowDown') || (event.key === 'Tab' && !event.shiftKey)) {
+        event.preventDefault()
+        clearTimeout(closeTimer.current)
+        document.querySelector<HTMLElement>('.link-preview button')?.focus()
+      }
+    }
+    window.addEventListener('keydown', key)
+    return () => window.removeEventListener('keydown', key)
   }, [])
 
   useEffect(() => {
@@ -117,48 +212,133 @@ export function DocumentTab({
     else dismissPreview()
   }, [active, dismissPreview])
   useEffect(() => {
+    if (!hasBeenActive || !active || printing) return
+    const key = `${descriptor.id}:${descriptor.revision ?? descriptor.modified}:${attempt}`
+    if (requested.current === key) return
+    requested.current = key
     let alive = true
-    let resource: LoadedDocument | undefined
+    let succeeded = false
+    let retries = 0
+    let retryTimer: ReturnType<typeof setTimeout> | undefined
+    let task: ReturnType<typeof startDocument> | undefined
     setError('')
-    setLoaded(null)
+    setUpdateError('')
+    setUpdated(false)
+    setReloading(Boolean(liveResource.current))
     setPassword(null)
-    const task = startDocument(descriptor, (submit, incorrect) => {
-      if (alive) {
-        setPassword({ submit, incorrect })
-        setPasswordInput('')
-      }
-    })
-    void task.promise
-      .then((value) => {
-        resource = value
-        if (!alive) {
-          void value.destroy()
-          return
-        }
-        setPassword(null)
-        setLoaded(value)
-        callbacks.current.onTitle(value.title)
-      })
-      .catch((reason) => {
+    const load = () => {
+      task = startDocument(descriptor, (submit, incorrect) => {
         if (alive) {
-          setPassword(null)
-          setError(reason.message || 'Could not read this PDF.')
+          setPassword({ submit, incorrect })
+          setPasswordInput('')
         }
       })
+      void task.promise
+        .then((value) => {
+          if (!alive) {
+            void value.destroy()
+            return
+          }
+          succeeded = true
+          const previous = liveResource.current
+          if (previous) {
+            dismissPreview()
+            const next = {
+              ...current.current,
+              panes: current.current.panes.map((pane) => ({
+                ...pane,
+                position: {
+                  ...(controllers.current.get(pane.id)?.currentPosition() ?? pane.position),
+                  page: Math.min(
+                    value.pdf.numPages,
+                    controllers.current.get(pane.id)?.currentPosition().page ?? pane.position.page,
+                  ),
+                },
+              })),
+            }
+            for (const controller of controllers.current.values()) controller.dispose()
+            controllers.current.clear()
+            pending.current.clear()
+            commit(next)
+            setActivePage(next.panes.find((pane) => pane.id === next.activePaneId)!.position.page)
+            retiredResources.current.push(previous)
+          }
+          liveResource.current = value
+          setPassword(null)
+          setReloading(false)
+          setUpdated(Boolean(previous))
+          setLoaded(value)
+          callbacks.current.onTitle(value.title)
+        })
+        .catch((reason) => {
+          if (!alive) return
+          // A compiler can pause mid-write. Retry before asking the reader to intervene.
+          if (liveResource.current && retries++ < 2 && !/budget|password/i.test(reason.message)) {
+            retryTimer = setTimeout(load, 900)
+            return
+          }
+          setPassword(null)
+          setReloading(false)
+          if (liveResource.current)
+            setUpdateError(reason.message || 'Could not load the updated PDF.')
+          else setError(reason.message || 'Could not read this PDF.')
+        })
+    }
+    load()
     return () => {
       alive = false
-      // Dispose views before their shared worker, including when React unmounts a tab.
+      clearTimeout(retryTimer)
+      if (!succeeded) {
+        requested.current = ''
+        void task?.cancel().catch(() => {})
+      }
+    }
+  }, [
+    descriptor.id,
+    descriptor.revision,
+    descriptor.modified,
+    attempt,
+    hasBeenActive,
+    active,
+    printing,
+    commit,
+    dismissPreview,
+  ])
+  useEffect(() => {
+    // Child views have detached from the old PDF before its shared worker is destroyed.
+    for (const resource of retiredResources.current.splice(0))
+      void resource.destroy().catch(() => {})
+  }, [loaded])
+  useEffect(() => {
+    if (
+      !active ||
+      !loaded ||
+      reloading ||
+      loaded.descriptor.revision !== descriptor.revision ||
+      !syncTarget ||
+      appliedSync.current === syncTarget.requestId
+    )
+      return
+    const controller = controllers.current.get(current.current.activePaneId)
+    if (!controller) return
+    appliedSync.current = syncTarget.requestId
+    dismissPreview()
+    void controller.syncTo(syncTarget).catch((reason) => callbacks.current.onError(reason.message))
+  }, [syncTarget, loaded, reloading, active, descriptor.revision, dismissPreview])
+  useEffect(
+    () => () => {
       for (const controller of controllers.current.values()) controller.dispose()
       controllers.current.clear()
-      if (resource) void resource.destroy().catch(() => {})
-      else void task.cancel().catch(() => {})
-    }
-  }, [descriptor.id, attempt])
+      if (liveResource.current) void liveResource.current.destroy().catch(() => {})
+      for (const resource of retiredResources.current.splice(0))
+        void resource.destroy().catch(() => {})
+    },
+    [],
+  )
   useEffect(
     () => () => {
       clearTimeout(hoverTimer.current)
       clearTimeout(closeTimer.current)
-      printJob.current?.abort()
       dragCleanup.current?.()
     },
     [],
@@ -220,36 +400,25 @@ export function DocumentTab({
         'pageNumber' in Object(destination)
           ? (destination as ResolvedDestination)
           : await loaded.resolver.resolve(destination as Destination)
-      if (split) splitFrom(sourceId, resolved)
-      else {
+      if (split) {
+        splitFrom(sourceId, resolved)
+        splitArea.current
+          ?.querySelector<HTMLElement>(`[data-pane-id="${sourceId}"] .pdf-container`)
+          ?.focus()
+      } else {
         focus(sourceId)
         await controllers.current.get(sourceId)?.navigate(resolved)
+        splitArea.current
+          ?.querySelector<HTMLElement>(`[data-pane-id="${sourceId}"] .pdf-container`)
+          ?.focus()
       }
     })().catch((reason) => callbacks.current.onError(reason.message))
   }
 
-  const print = async () => {
-    if (!loaded || printJob.current) return
+  const print = () => {
+    if (!loaded || printing) return
     dismissPreview()
-    const job = new AbortController()
-    printJob.current = job
-    setPrintProgress({ done: 0, total: loaded.pdf.numPages, dialog: false })
-    let cleanup: (() => void) | undefined
-    try {
-      cleanup = await preparePrint(loaded, job.signal, (done, total) =>
-        setPrintProgress({ done, total, dialog: false }),
-      )
-      setPrintProgress({ done: loaded.pdf.numPages, total: loaded.pdf.numPages, dialog: true })
-      const result = await window.desktop.print()
-      if (!result.success && result.reason && !/cancel/i.test(result.reason))
-        callbacks.current.onError(result.reason)
-    } catch (reason) {
-      if (!job.signal.aborted) callbacks.current.onError((reason as Error).message)
-    } finally {
-      cleanup?.()
-      printJob.current = null
-      setPrintProgress(null)
-    }
+    onPrint(loaded)
   }
 
   useEffect(() => {
@@ -307,10 +476,10 @@ export function DocumentTab({
     const move = (pointer: PointerEvent) => {
       const box = splitArea.current!.getBoundingClientRect()
       const ratio =
-        current.current.orientation === 'horizontal'
+        effectiveOrientation === 'horizontal'
           ? (pointer.clientX - box.left) / box.width
           : (pointer.clientY - box.top) / box.height
-      commit({ ...current.current, ratio: Math.min(0.8, Math.max(0.2, ratio)) })
+      commit({ ...current.current, ratio: Math.min(1 - minRatio, Math.max(minRatio, ratio)) })
     }
     const finish = () => {
       element.removeEventListener('pointermove', move)
@@ -326,76 +495,181 @@ export function DocumentTab({
     element.addEventListener('pointercancel', finish)
   }
 
-  return (
-    <div className="document-tab" hidden={!active}>
-      <div className="document-toolbar">
+  const toolbar = (
+    <div className="document-toolbar">
+      <IconButton
+        icon={PanelLeft}
+        label="Toggle sidebar"
+        active={sidebar !== null}
+        onClick={() => {
+          dismissPreview()
+          onSidebar(sidebar ? null : lastSidebar.current)
+        }}
+        aria-expanded={sidebar !== null}
+        aria-controls={`navigation-${descriptor.id}`}
+      />
+      <span className="toolbar-divider" />
+      <div className="document-heading">
+        <span className="document-title" title={loaded?.title ?? descriptor.name}>
+          {loaded?.title ?? descriptor.name}
+        </span>
+        <span className="document-subtitle">
+          {loaded ? `${loaded.pdf.numPages} pages` : 'Opening paper'}
+          <span>·</span>
+          {descriptor.location}
+        </span>
+      </div>
+      <div className="document-actions">
         <IconButton
-          icon={PanelLeft}
-          label="Toggle sidebar"
-          active={sidebar !== null}
-          onClick={() => onSidebar(sidebar ? null : 'outline')}
+          icon={RefreshCw}
+          label={reloadLabel}
+          disabled={printing || reloading}
+          onClick={() => setAttempt((value) => value + 1)}
+        />
+        <IconButton
+          icon={Search}
+          label="Find in paper"
+          active={findOpen}
+          disabled={!loaded}
+          onClick={() => setFindOpen(!findOpen)}
         />
         <span className="toolbar-divider" />
-        <div className="document-heading">
-          <span className="document-title" title={loaded?.title ?? descriptor.name}>
-            {loaded?.title ?? descriptor.name}
-          </span>
-          <span className="document-subtitle">
-            {loaded ? `${loaded.pdf.numPages} pages` : 'Opening paper'}
-            <span>·</span>
-            {descriptor.location}
-          </span>
-        </div>
-        <div className="document-actions">
+        <IconButton
+          icon={Columns2}
+          label="Toggle split view"
+          active={snapshot.panes.length === 2}
+          disabled={!loaded}
+          onClick={() =>
+            snapshot.panes.length === 2
+              ? closePane(snapshot.panes.find((p) => p.id !== snapshot.activePaneId)!.id)
+              : splitFrom(snapshot.activePaneId)
+          }
+        />
+        {snapshot.panes.length === 2 && (
           <IconButton
-            icon={Search}
-            label="Find in paper"
-            active={findOpen}
-            disabled={!loaded}
-            onClick={() => setFindOpen(!findOpen)}
-          />
-          <span className="toolbar-divider" />
-          <IconButton
-            icon={Columns2}
-            label="Toggle split view"
-            active={snapshot.panes.length === 2}
-            disabled={!loaded}
-            onClick={() =>
-              snapshot.panes.length === 2
-                ? closePane(snapshot.panes.find((p) => p.id !== snapshot.activePaneId)!.id)
-                : splitFrom(snapshot.activePaneId)
+            icon={snapshot.orientation === 'horizontal' ? Rows2 : Columns2}
+            label={
+              snapshot.orientation === 'horizontal'
+                ? 'Stack panes vertically'
+                : 'Arrange panes side by side'
             }
+            onClick={() => {
+              dismissPreview()
+              commit({
+                ...current.current,
+                orientation: snapshot.orientation === 'horizontal' ? 'vertical' : 'horizontal',
+              })
+            }}
           />
-          {snapshot.panes.length === 2 && (
-            <IconButton
-              icon={snapshot.orientation === 'horizontal' ? Rows2 : Columns2}
-              label={
-                snapshot.orientation === 'horizontal'
-                  ? 'Stack panes vertically'
-                  : 'Arrange panes side by side'
+        )}
+        {compact ? (
+          <details
+            className="reader-overflow"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.currentTarget.open = false
+                event.currentTarget.querySelector('summary')?.focus()
               }
-              onClick={() => {
-                dismissPreview()
-                commit({
-                  ...current.current,
-                  orientation: snapshot.orientation === 'horizontal' ? 'vertical' : 'horizontal',
-                })
-              }}
+            }}
+          >
+            <summary aria-label="More reader actions" title="More reader actions">
+              <Ellipsis size={18} />
+            </summary>
+            <div className="reader-overflow-content">
+              {secondaryActions}
+              <button
+                className="overflow-reload"
+                disabled={printing || reloading}
+                onClick={() => setAttempt((value) => value + 1)}
+              >
+                {reloadLabel}
+              </button>
+              {readerHost().toggleFullscreen && (
+                <button onClick={() => void readerHost().toggleFullscreen?.()}>
+                  Toggle fullscreen
+                </button>
+              )}
+              {readerHost().toggleFullscreen && (
+                <button disabled={!loaded || printing} onClick={() => void print()}>
+                  Print paper
+                </button>
+              )}
+            </div>
+          </details>
+        ) : (
+          <>
+            {readerHost().toggleFullscreen && (
+              <IconButton
+                icon={Maximize2}
+                label="Toggle fullscreen"
+                onClick={() => void readerHost().toggleFullscreen?.()}
+              />
+            )}
+            <IconButton
+              icon={Printer}
+              label="Print paper"
+              disabled={!loaded || printing}
+              onClick={() => void print()}
             />
-          )}
-          <IconButton
-            icon={Maximize2}
-            label="Toggle fullscreen"
-            onClick={() => void window.desktop.toggleFullscreen()}
-          />
-          <IconButton
-            icon={Printer}
-            label="Print paper"
-            disabled={!loaded}
-            onClick={() => void print()}
-          />
-        </div>
+          </>
+        )}
       </div>
+    </div>
+  )
+
+  return (
+    <div
+      className={`document-tab${compact ? ' compact-document' : ''}`}
+      hidden={!active}
+      data-loaded-revision={loaded?.descriptor.revision}
+    >
+      {toolbarTarget === undefined
+        ? toolbar
+        : toolbarTarget && createPortal(toolbar, toolbarTarget)}
+      {loaded && (fileError || updateError || reloading || updated || password) && (
+        <div
+          className={`file-update-banner${fileError || updateError ? ' has-warning' : ''}`}
+          role="status"
+        >
+          {reloading ? <RefreshCw size={13} className="is-spinning" /> : <Check size={13} />}
+          <span>
+            {fileError ||
+              (updateError
+                ? `Keeping the current PDF. ${updateError}`
+                : password
+                  ? 'The updated PDF needs a password.'
+                  : reloading
+                    ? 'Updating from disk…'
+                    : 'Updated from disk. Your place is saved.')}
+          </span>
+          {password && (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault()
+                password.submit(passwordInput)
+                setPasswordInput('')
+                setPassword(null)
+              }}
+            >
+              <input
+                type="password"
+                aria-label="Updated PDF password"
+                value={passwordInput}
+                onChange={(event) => setPasswordInput(event.target.value)}
+              />
+              <button type="submit">Unlock updated PDF</button>
+            </form>
+          )}
+          {(fileError || updateError) && (
+            <button
+              disabled={printing || reloading}
+              onClick={() => setAttempt((value) => value + 1)}
+            >
+              Retry
+            </button>
+          )}
+        </div>
+      )}
       {!loaded ? (
         <div className="document-state">
           {error ? (
@@ -454,7 +728,7 @@ export function DocumentTab({
         </div>
       ) : (
         <div className="reading-workspace">
-          {sidebar && (
+          {sidebar ? (
             <Sidebar
               loaded={loaded}
               mode={sidebar}
@@ -462,17 +736,55 @@ export function DocumentTab({
               sourceId={snapshot.activePaneId}
               rotation={controllers.current.get(snapshot.activePaneId)?.status().rotation ?? 0}
               onMode={onSidebar}
+              onCollapse={() => {
+                dismissPreview()
+                focusSidebar.current = true
+                onSidebar(null)
+              }}
+              position={sidebarPosition}
               onNavigate={(destination, split) =>
                 navigate(current.current.activePaneId, destination, split)
               }
               onHover={hover}
               onLeave={leave}
             />
+          ) : (
+            <aside
+              className="sidebar-collapsed"
+              id={`navigation-${descriptor.id}`}
+              aria-label="Collapsed document sidebar"
+            >
+              <IconButton
+                icon={sidebarPosition === 'right' ? PanelRightOpen : PanelLeftOpen}
+                label="Show sidebar"
+                aria-expanded={false}
+                onClick={() => {
+                  focusSidebar.current = true
+                  onSidebar(lastSidebar.current)
+                }}
+              />
+              <IconButton
+                icon={ListTree}
+                label="Show document outline"
+                onClick={() => {
+                  focusSidebar.current = true
+                  onSidebar('outline')
+                }}
+              />
+              <IconButton
+                icon={Grid2X2}
+                label="Show page thumbnails"
+                onClick={() => {
+                  focusSidebar.current = true
+                  onSidebar('thumbnails')
+                }}
+              />
+            </aside>
           )}
           <div
             ref={splitArea}
-            className={`split-area ${snapshot.orientation}`}
-            style={{ '--split-ratio': snapshot.ratio } as React.CSSProperties}
+            className={`split-area ${effectiveOrientation}`}
+            style={{ '--split-ratio': effectiveRatio } as React.CSSProperties}
           >
             {hasBeenActive &&
               snapshot.panes.map((pane, index) => (
@@ -485,6 +797,8 @@ export function DocumentTab({
                     loaded={loaded}
                     active={pane.id === snapshot.activePaneId}
                     split={snapshot.panes.length === 2}
+                    toolbarTarget={paneToolbarTarget}
+                    paneLabel={paneToolbarTarget !== undefined ? `Pane ${index + 1}` : undefined}
                     findOpen={findOpen}
                     onCloseFind={() => setFindOpen(false)}
                     onFocus={() => focus(pane.id)}
@@ -505,10 +819,11 @@ export function DocumentTab({
                 role="separator"
                 tabIndex={0}
                 aria-label="Resize panes"
-                aria-orientation={snapshot.orientation === 'horizontal' ? 'vertical' : 'horizontal'}
-                aria-valuenow={Math.round(snapshot.ratio * 100)}
-                aria-valuemin={20}
-                aria-valuemax={80}
+                title="Drag to resize panes. Double-click to reset."
+                aria-orientation={effectiveOrientation === 'horizontal' ? 'vertical' : 'horizontal'}
+                aria-valuenow={Math.round(effectiveRatio * 100)}
+                aria-valuemin={Math.ceil(minRatio * 100)}
+                aria-valuemax={Math.floor((1 - minRatio) * 100)}
                 onPointerDown={startDrag}
                 onDoubleClick={() => commit({ ...current.current, ratio: 0.5 })}
                 onKeyDown={(event) => {
@@ -522,7 +837,7 @@ export function DocumentTab({
                       ratio:
                         event.key === 'Home'
                           ? 0.5
-                          : Math.min(0.8, Math.max(0.2, current.current.ratio + delta)),
+                          : Math.min(1 - minRatio, Math.max(minRatio, effectiveRatio + delta)),
                     })
                   }
                 }}
@@ -545,30 +860,6 @@ export function DocumentTab({
           onClose={dismissPreview}
           onNavigate={(destination, split) => navigate(preview.sourceId, destination, split)}
         />
-      )}
-      {printProgress && (
-        <div className="modal-backdrop">
-          <div
-            className="print-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Prepare printing"
-          >
-            <Printer size={28} strokeWidth={1.4} />
-            <h2>{printProgress.dialog ? 'Ready to print' : 'Preparing your paper'}</h2>
-            <p>
-              {printProgress.dialog
-                ? 'Choose your printer in the print dialog.'
-                : `Rendering page ${printProgress.done} of ${printProgress.total}…`}
-            </p>
-            <progress value={printProgress.done} max={printProgress.total} />
-            {!printProgress.dialog && (
-              <button className="text-button" onClick={() => printJob.current?.abort()}>
-                Cancel
-              </button>
-            )}
-          </div>
-        </div>
       )}
     </div>
   )

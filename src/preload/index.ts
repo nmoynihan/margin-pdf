@@ -1,35 +1,48 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { DesktopAPI } from '../shared/types'
+import type { DesktopAPI, DesktopEvents, IpcRequests } from '../shared/types'
 
-function subscribe<T>(channel: string, callback: (value: T) => void) {
-  const listener = (_event: Electron.IpcRendererEvent, value: T) => callback(value)
+function subscribe<K extends keyof DesktopEvents>(
+  channel: K,
+  callback: (value: DesktopEvents[K]) => void,
+) {
+  const listener = (_event: Electron.IpcRendererEvent, value: DesktopEvents[K]) => callback(value)
   ipcRenderer.on(channel, listener)
   return () => ipcRenderer.removeListener(channel, listener)
 }
 
+function invoke<K extends keyof IpcRequests>(
+  channel: K,
+  ...args: IpcRequests[K]['args']
+): Promise<IpcRequests[K]['result']> {
+  return ipcRenderer.invoke(channel, ...args)
+}
+
 const api: DesktopAPI = {
-  bootstrap: () => ipcRenderer.invoke('bootstrap'),
-  chooseFiles: () => ipcRenderer.invoke('choose-files'),
-  openSample: () => ipcRenderer.invoke('open-sample'),
+  bootstrap: () => invoke('bootstrap'),
+  rendererReady: () => invoke('renderer-ready'),
+  restart: (safe) => invoke('restart', safe),
+  setCompact: (compact) => invoke('set-compact', compact),
+  onCompact: (callback) => subscribe('compact-mode', callback),
+  chooseFiles: () => invoke('choose-files'),
+  openSample: () => invoke('open-sample'),
   openDropped: (files) =>
-    ipcRenderer.invoke(
-      'open-dropped',
-      files.map((file) => webUtils.getPathForFile(file)).filter(Boolean),
-    ),
-  reopen: (id) => ipcRenderer.invoke('reopen', id),
-  readDocument: (id) => ipcRenderer.invoke('read-document', id),
-  saveSession: (snapshot) => ipcRenderer.invoke('save-session', snapshot),
-  clearRecent: () => ipcRenderer.invoke('clear-recent'),
-  openExternal: (url) => ipcRenderer.invoke('open-external', url),
-  print: () => ipcRenderer.invoke('print'),
-  toggleFullscreen: () => ipcRenderer.invoke('toggle-fullscreen'),
+    invoke('open-dropped', files.map((file) => webUtils.getPathForFile(file)).filter(Boolean)),
+  reopen: (id) => invoke('reopen', id),
+  readDocument: (id) => invoke('read-document', id),
+  watchDocuments: (documents) => invoke('watch-documents', documents),
+  onDocumentChanged: (callback) => subscribe('document-changed', callback),
+  saveSession: (snapshot) => invoke('save-session', snapshot),
+  clearRecent: (snapshot) => invoke('clear-recent', snapshot),
+  openExternal: (url) => invoke('open-external', url),
+  print: () => invoke('print'),
+  toggleFullscreen: () => invoke('toggle-fullscreen'),
   onFiles: (callback) => subscribe('files-opened', callback),
   onOpenError: (callback) => subscribe('open-error', callback),
   onCommand: (callback) => subscribe('app-command', callback),
   onSystemTheme: (callback) => subscribe('system-theme', callback),
   onBeforeClose: (callback) =>
     subscribe('prepare-close', () => {
-      void ipcRenderer.invoke('ready-to-close', callback())
+      void invoke('ready-to-close', callback())
     }),
 }
 contextBridge.exposeInMainWorld('desktop', api)

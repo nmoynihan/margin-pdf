@@ -1,0 +1,15 @@
+# Opt-in release profile. Required metadata/secrets are listed in SECURITY.md.
+extends: ./electron-builder.yml
+appId: ${env.MARGIN_PDF_APP_ID}
+forceCodeSigning: true
+extraMetadata:
+  homepage: ${env.MARGIN_PDF_HOMEPAGE}
+  author:
+    name: ${env.MARGIN_PDF_AUTHOR}
+    email: ${env.MARGIN_PDF_EMAIL}
+mac:
+  notarize: true
+win:
+  signtoolOptions:
+    signingHashAlgorithms: [sha256]
+    rfc3161TimeStampServer: https://timestamp.digicert.com

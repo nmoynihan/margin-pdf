@@ -8,3 +8,21 @@ playwright-report/
 tests/fixtures/*.pdf
 *.log
 .DS_Store
+
+extensions/vscode/dist/
+extensions/vscode/*.vsix
+.vscode-test/
+
+extensions/chrome/dist/
+
+# Local credentials and generated developer state
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+coverage/
+release-artifacts/
+release-upload/
+extensions/vscode/icon.png

@@ -1,8 +1,29 @@
 import { describe, expect, it } from 'vitest'
-import { sanitizePosition, sanitizeSession } from '../../src/shared/session'
-import { emptySession, initialPosition } from '../../src/shared/types'
+import { sanitizePosition, sanitizeSession, sanitizeLayout } from '../../src/shared/session'
+import { emptySession, initialPosition, defaultLayout } from '../../src/shared/types'
 
 describe('session restoration', () => {
+  it('keeps appearance and placement independent and validates saved positions', () => {
+    const layout = {
+      controls: 'bottom',
+      tabs: 'right',
+      sidebar: 'right',
+      documentTools: 'bottom',
+      pageControls: 'bottom',
+    }
+    for (const skin of ['classic', 'folio', 'studio', 'terminal', 'focus'])
+      expect(sanitizeSession({ ...emptySession(), skin, layout }).layout).toEqual(layout)
+    expect(sanitizeSession({ version: 1, skin: 'terminal' }).layout).toEqual(defaultLayout())
+    expect(sanitizeLayout({ controls: '../style', tabs: null, sidebar: 42 })).toEqual(
+      defaultLayout(),
+    )
+  })
+  it('persists supported skins and defaults older or invalid selections to Classic', () => {
+    for (const skin of ['classic', 'folio', 'studio', 'terminal', 'focus'])
+      expect(sanitizeSession({ ...emptySession(), skin }).skin).toBe(skin)
+    expect(sanitizeSession({ version: 1 }).skin).toBe('classic')
+    expect(sanitizeSession({ ...emptySession(), skin: '../injected.css' }).skin).toBe('classic')
+  })
   it('restores independent panes, orientation, and closed-document positions', () => {
     const tab = {
       documentId: 'paper',

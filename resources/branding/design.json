@@ -1,0 +1,19 @@
+{
+  "name": "Margin PDF",
+  "concept": "An open book forms an M, with a vertical cutout marking the page margin.",
+  "palette": {
+    "eucalyptus": "#477568",
+    "ivory": "#F6F3EA"
+  },
+  "tool": "Built-in image_gen",
+  "finalIcon": {
+    "file": "margin-pdf-icon-master.png",
+    "prompt": "Create a perfectly clean flat graphic desktop app icon for Margin PDF. This is a minimalist 2D vector-style logo exported as a raster image. Completely opaque image: the entire square canvas is one absolutely uniform flat solid eucalyptus green #477568, edge to edge, with no transparency anywhere. Center one ivory #F6F3EA open-book silhouette, shaped like an uppercase M. The open book has gently bowed top page edges dipping into a V at the center, straight upright sides and a pointed center at the lower spine. Cut a clean M-shaped green negative space into the middle of the book and one narrow vertical green slit into its left side to suggest a document margin. Use bold simple large geometry and generous margins, emblem about 68 percent of canvas width. Every green pixel away from antialiased edges must be the EXACT same flat solid green. Every ivory pixel away from antialiased edges must be the EXACT same flat solid ivory. Zero shading, zero glow, zero shadows, zero texture, zero transparency, zero holes in background, zero gradients, zero blurry patches, no lighting, no text, no border, no mockup. Just two uniform solid colors and one elegantly balanced, crisp editorial logo symbol."
+  },
+  "transparentMark": {
+    "file": "margin-pdf-mark.png",
+    "prompt": "Use case: logo-brand\nAsset type: production app logo symbol for \"Margin PDF\", a focused desktop reader for academic papers with link previews and split reading panes.\nPrimary request: Design one distinctive, beautifully proportioned symbol combining an open pair of pages, the letter M, and a generous document margin. Use a simple folded-paper silhouette whose negative space makes a subtle uppercase M; a straight vertical margin feature should give it an editorial character. The symbol should feel calm, intelligent, timeless and appropriate for a scholarly reading tool.\nStyle/medium: precise flat vector-style graphic, bold readable silhouette, few geometric forms, exceptionally clean edges, careful optical balance.\nColor palette: deep muted eucalyptus green #477568 with warm ivory #F6F3EA where needed, matching the existing app interface. Main silhouette green; transparent negative space.\nComposition/framing: one isolated centered symbol, square canvas, generous even padding, symbol occupies about 72 percent of the width. It must remain recognizable at 24 px. This is the final symbol asset, not a presentation board.\nConstraints: genuinely transparent background; no letters or words printed in the image, no PDF badge, no outer tile or container, no gradients, no texture, no shadows, no 3D, no mockup, no decorative fine lines, no stock folded-corner document pictogram, no watermark. Aim for an ownable monogram with a page margin."
+  },
+  "exports": ["../margin-pdf-icon.png", "../margin-pdf-icon.ico", "../margin-pdf-icon.icns"],
+  "rebuild": "node scripts/create-icons.mjs"
+}

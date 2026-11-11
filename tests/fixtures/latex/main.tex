@@ -1,0 +1,11 @@
+\documentclass{article}
+\usepackage{hyperref}
+\begin{document}
+\section{Introduction}\label{intro}
+Read the \hyperref[chapter]{chapter on the next page} without losing your place.
+\newpage
+\input{chapter}
+\newpage
+\section{References}
+Return to the \hyperref[intro]{introduction}.
+\end{document}

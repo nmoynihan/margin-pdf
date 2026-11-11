@@ -1,0 +1,26 @@
+# Security and release maintenance
+
+Margin PDF runs offline. PDF files are untrusted input to Electron/Chromium and PDF.js. Input and raster budgets reduce accidental resource spikes; they are not a guarantee against parser defects or a bound on process memory. Keep the operating system, Electron and PDF.js patched.
+
+Report ordinary bugs through [GitHub Issues](https://github.com/nmoynihan/margin-pdf/issues). Report suspected vulnerabilities privately to [the maintainer](https://github.com/nmoynihan), using the contact address on that public profile, and avoid attaching private documents to public reports.
+
+## Security updates
+
+The release maintainer must monitor Electron security releases, Chromium advisories affecting the bundled Electron version, Mozilla PDF.js advisories, and GitHub/npm dependency advisories weekly and before every release. Run `npm audit` and review upstream release notes; a clean dependency audit alone is insufficient. Triage active exploitation or critical parser/sandbox issues immediately, suspend affected downloads if necessary, and aim to publish a tested patch within 48 hours. Track other security fixes within seven days. These are project targets, not an assurance that a staffed response team exists.
+
+Update pinned dependencies and the lockfile together. Run unit, Electron integration, production build, formatting, and fresh packaged smoke checks. Test password retry, offline worker/assets, navigation, session restoration and printing on each release platform. Recheck fuses after Electron upgrades. Review the source and permissions of CI action updates before replacing their pinned commit hashes. The workflow pins checkout v4.3.1, setup-node v4.4.0 and upload-artifact v4.6.2; keep repository-token permissions read-only and signing secrets out of pull-request jobs.
+
+Publish signed/notarised installers, release notes identifying security fixes and the bundled Electron/PDF.js versions, and SHA-256 checksums through a controlled project release channel. Users currently update manually by downloading the replacement installer. No automatic updater or signing-key distribution channel is implemented. If a release is affected, place a prominent update notice on the eventual release page and withdraw compromised artifacts. Document the incident and remediation without exposing private documents or profiles.
+
+## Release configuration and outstanding dependencies
+
+`electron-builder.yml` builds local/CI test artifacts; these may be unsigned. It enables ASAR integrity validation (enforced on supported Windows/macOS builds), requires ASAR loading, disables RunAsNode, Node environment options, CLI inspection and extra file-protocol privileges. Linux has no Electron ASAR integrity enforcement; artifact provenance still depends on distribution signatures/checksums. `resources/entitlements.mac.plist` enables the JIT entitlement required by Electron; macOS hardened runtime is enabled.
+
+`npm run dist:release` uses `electron-builder.release.yml`, requires code signing on Windows/macOS, and enables macOS notarisation. It builds for the current platform. Run on the corresponding OS in a protected release environment after the normal checks. The profile is prepared but has not produced a trusted release. The following exact inputs remain unavailable in this repository/session:
+
+- Real project application identifier (`MARGIN_PDF_APP_ID`), HTTPS homepage/release URL (`MARGIN_PDF_HOMEPAGE`), maintainer name (`MARGIN_PDF_AUTHOR`) and monitored email (`MARGIN_PDF_EMAIL`). The default development metadata uses reserved `.invalid` domains. A private vulnerability reporting route and responsible release owner must also be designated.
+- macOS Developer ID Application certificate/private key (`CSC_LINK`, `CSC_KEY_PASSWORD`) and an Apple notarisation identity, either `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, or `APPLE_API_KEY`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`. Import/choose the appropriate signing identity in the protected macOS keychain. Validate signatures with `codesign --verify --deep --strict`, Gatekeeper with `spctl --assess --type execute`, and notarisation stapling with `xcrun stapler validate` on both architectures.
+- Windows code-signing certificate/private key (`CSC_LINK`, `CSC_KEY_PASSWORD`, or a provisioned hardware/cloud signing identity). Validate the installed executable and installer using `Get-AuthenticodeSignature` on Windows; test timestamp verification and install/uninstall.
+- A controlled publishing account/repository, artifact verification/signing policy and release approval owner. Generate checksums for the final signed installers, for example `sha256sum dist/*.AppImage dist/*.deb` on Linux; use the native equivalent for other platforms. Do not publish placeholder metadata or treat unsigned CI artifacts as authenticated releases.
+
+Signing secrets must only be supplied by a trusted release operator or protected release job. The ordinary CI matrix intentionally receives none and does not publish releases. Native dialog/physical printer behavior, OS file associations, screen-reader behavior, Windows signing and macOS notarisation require checks on their respective platforms before distribution.

@@ -12,8 +12,8 @@
   --surface: #ffffff;
   --surface-alt: #f0f2f5;
   --ink: #283243;
-  --muted: #7b8594;
-  --subtle: #a3aab5;
+  --muted: #5e6979;
+  --subtle: #626d7c;
   --border: #e4e7ec;
   --hover: #edf0f3;
   --accent: #477568;
@@ -30,7 +30,7 @@
   --surface-alt: #242a34;
   --ink: #dde2eb;
   --muted: #929cab;
-  --subtle: #646e7e;
+  --subtle: #9aa5b5;
   --border: #303743;
   --hover: #2b323e;
   --accent: #9cbeaf;
@@ -97,23 +97,26 @@ button svg {
   display: none !important;
 }
 ::selection {
-  background: #81baa96b;
+  background: color-mix(in srgb, var(--accent) 32%, transparent);
 }
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #8a94a755;
-  border: 3px solid transparent;
-  border-radius: 9px;
+  background: var(--muted);
+  border: 3px solid var(--surface-alt);
+  border-radius: 8px;
+  min-height: 48px;
+  min-width: 48px;
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background-color: #8a94a799;
+  background-color: var(--ink);
 }
+::-webkit-scrollbar-track,
 ::-webkit-scrollbar-corner {
-  background: transparent;
+  background: var(--surface-alt);
 }
 .app-shell {
   height: 100%;
@@ -146,27 +149,23 @@ button svg {
   width: 50px;
   height: 50px;
   border-radius: 12px;
-  background: var(--accent-soft);
-  color: var(--accent);
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
-.brand-mark svg {
-  width: 36px;
-  height: 36px;
+.brand-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 .brand-mark.small {
-  width: 31px;
-  height: 33px;
+  width: 32px;
+  height: 32px;
   border-radius: 7px;
-}
-.brand-mark.small svg {
-  width: 29px;
-  height: 29px;
 }
 .app-label {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 1.7px;
   font-weight: 600;
   margin: 5px 0 0 7px;
@@ -207,7 +206,7 @@ button svg {
   background: var(--hover);
 }
 .keyboard-hint {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted);
   border-left: 1px solid var(--border);
   padding-left: 9px;
@@ -342,7 +341,7 @@ button svg {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted);
 }
 .document-actions {
@@ -373,7 +372,7 @@ button svg {
   padding: 0 12px 0 20px;
 }
 .sidebar-header > span {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--muted);
   letter-spacing: 1.4px;
@@ -457,7 +456,7 @@ button svg {
 }
 .sidebar-footnote {
   padding: 12px 20px;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted);
   border-top: 1px solid var(--border);
   display: flex;
@@ -477,7 +476,7 @@ button svg {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .thumbnail-paper {
   width: 148px;
@@ -516,7 +515,7 @@ button svg {
   min-height: 0;
 }
 .first-pane-slot {
-  flex: 0 0 calc(var(--split-ratio) * 100% - 3px);
+  flex: 0 0 calc(var(--split-ratio) * 100% - 6px);
   order: 0;
 }
 .second-pane-slot {
@@ -528,8 +527,9 @@ button svg {
 }
 .split-divider {
   order: 1;
-  width: 6px;
-  background: var(--border);
+  width: 12px;
+  background: var(--surface-alt);
+  border-inline: 1px solid var(--border);
   cursor: col-resize;
   display: flex;
   justify-content: center;
@@ -539,10 +539,10 @@ button svg {
   touch-action: none;
 }
 .split-divider span {
-  height: 30px;
-  width: 2px;
-  border-radius: 2px;
-  background: var(--subtle);
+  height: 36px;
+  width: 6px;
+  border-radius: 0;
+  background: radial-gradient(circle, var(--subtle) 1.5px, transparent 2px) center / 6px 6px;
 }
 .split-divider:hover,
 .split-divider:focus-visible {
@@ -550,12 +550,14 @@ button svg {
 }
 .vertical > .split-divider {
   width: 100%;
-  height: 6px;
+  height: 12px;
   cursor: row-resize;
+  border-inline: 0;
+  border-block: 1px solid var(--border);
 }
 .vertical > .split-divider span {
-  height: 2px;
-  width: 30px;
+  height: 6px;
+  width: 36px;
 }
 .resizing,
 .resizing * {
@@ -624,7 +626,7 @@ button svg {
 }
 .pane-toolbar select {
   width: 89px;
-  font-size: 10px;
+  font-size: 11px;
   height: 26px;
   background: transparent;
   border: 0;
@@ -635,7 +637,7 @@ button svg {
   flex: 1;
 }
 .pane-label {
-  font-size: 8px;
+  font-size: 11px;
   color: var(--muted);
   letter-spacing: 0.8px;
   margin-right: 5px;
@@ -650,6 +652,7 @@ button svg {
   inset: 0;
   overflow: auto;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   outline-offset: -3px;
 }
 .pdf-container .pdfViewer {
@@ -663,8 +666,8 @@ button svg {
   box-shadow: 0 2px 7px #0002;
 }
 .pdf-container .annotationLayer .linkAnnotation > a:hover {
-  background: #6bab9160;
-  box-shadow: 0 0 0 2px #6bab9130;
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 .find-bar {
   flex-shrink: 0;
@@ -699,7 +702,7 @@ button svg {
   color: var(--accent);
 }
 .match-count {
-  font-size: 10px;
+  font-size: 11px;
   white-space: nowrap;
   min-width: 32px;
   text-align: center;
@@ -713,7 +716,7 @@ button svg {
   justify-content: space-between;
   border-top: 1px solid var(--border);
   background: var(--surface);
-  font-size: 9px;
+  font-size: 11px;
   color: var(--muted);
   user-select: none;
 }
@@ -747,7 +750,7 @@ button svg {
   padding-bottom: 45px;
 }
 .eyebrow {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--accent);
   letter-spacing: 1.9px;
   font-weight: 650;
@@ -792,7 +795,7 @@ button svg {
   box-shadow: 0 2px 4px #0001;
 }
 [data-theme='dark'] .primary-button {
-  background: #638c7d;
+  background: #477568;
 }
 .primary-button:hover {
   filter: brightness(1.06);
@@ -801,7 +804,7 @@ button svg {
   margin-left: 18px;
 }
 .welcome-drop {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted);
   margin-top: 14px;
   display: flex;
@@ -813,7 +816,7 @@ button svg {
   align-items: center;
   gap: 5px;
   padding: 0;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--accent);
 }
 .sample-button:hover {
@@ -847,7 +850,7 @@ button svg {
   letter-spacing: -0.15px;
 }
 .feature-card p {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted);
   line-height: 1.8;
   margin: 0;
@@ -882,7 +885,7 @@ button svg {
 }
 .demo-popover > span {
   display: block;
-  font-size: 8px;
+  font-size: 11px;
   margin-top: 4px;
   color: var(--muted);
 }
@@ -1051,7 +1054,7 @@ button svg {
 .recent-file small {
   display: flex;
   gap: 7px;
-  font-size: 9px;
+  font-size: 11px;
   color: var(--muted);
   margin-top: 6px;
 }
@@ -1061,12 +1064,12 @@ button svg {
 .welcome-footer {
   display: flex;
   justify-content: space-between;
-  font-size: 9px;
+  font-size: 11px;
   color: var(--subtle);
   padding-bottom: 26px;
 }
 .welcome-footer > span:first-child {
-  font-size: 8px;
+  font-size: 11px;
   letter-spacing: 1.5px;
 }
 .document-state {
@@ -1152,14 +1155,14 @@ button svg {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 1px;
   font-weight: 600;
   color: var(--accent);
 }
 .preview-page {
   margin-left: auto;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted);
 }
 .preview-heading .icon-button {
@@ -1192,7 +1195,7 @@ button svg {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  color: #6e7887;
+  color: #5e6979;
   font-size: 12px;
   background: white;
 }
@@ -1206,7 +1209,7 @@ button svg {
   border-top: 1px solid var(--border);
 }
 .preview-footer button {
-  font-size: 10px;
+  font-size: 11px;
   display: flex;
   gap: 6px;
   align-items: center;
@@ -1310,7 +1313,7 @@ button svg {
     transform-origin: right center;
   }
   .feature-card p {
-    font-size: 9px;
+    font-size: 11px;
   }
   .sidebar {
     width: 196px;
@@ -1323,9 +1326,6 @@ button svg {
   }
   .pane-toolbar {
     padding: 0 3px;
-  }
-  .pane-toolbar .rotation-button {
-    display: none;
   }
 }
 @media (max-width: 800px) {
@@ -1348,7 +1348,7 @@ button svg {
     padding-right: 17px;
   }
   .reference-demo {
-    font-size: 10px;
+    font-size: 11px;
   }
   .demo-popover {
     left: 10px;
@@ -1365,9 +1365,6 @@ button svg {
   .document-toolbar {
     padding: 0 10px;
     gap: 7px;
-  }
-  .pane-history {
-    display: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1393,6 +1390,8 @@ button svg {
     display: block;
   }
   .printed-page {
+    position: relative;
+    overflow: hidden;
     break-after: page;
     break-inside: avoid;
     margin: 0;
@@ -1402,8 +1401,46 @@ button svg {
     break-after: auto;
   }
   .printed-page img {
+    position: absolute;
     display: block;
     width: 100%;
     height: 100%;
+  }
+}
+
+.boundary-content {
+  display: contents;
+}
+.reader-pane {
+  container: pane / inline-size;
+}
+.pane-toolbar,
+.find-bar {
+  flex-wrap: wrap;
+  height: auto;
+  min-height: 40px;
+  padding: 5px 8px;
+}
+.pane-toolbar > *,
+.pane-history,
+.find-bar > button {
+  flex-shrink: 0;
+}
+.find-bar input {
+  flex: 1 1 100px;
+  min-width: 0;
+}
+@container pane (max-width: 420px) {
+  .pane-toolbar-spacer,
+  .pane-label {
+    display: none;
+  }
+  .pane-history {
+    margin-right: 1px;
+  }
+  .pane-toolbar,
+  .find-bar {
+    gap: 3px;
+    padding: 5px;
   }
 }

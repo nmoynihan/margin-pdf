@@ -1,14 +1,15 @@
 {
-  "name": "pdf-junkie",
-  "productName": "PDF Junkie",
+  "name": "margin-pdf",
+  "productName": "Margin PDF",
   "version": "0.1.0",
   "description": "A focused academic PDF reader with link previews and independent split panes.",
   "author": {
-    "name": "PDF Junkie contributors",
-    "email": "noreply@pdf-junkie.invalid"
+    "name": "Nathan Moynihan",
+    "email": "n.moynihan@qmul.ac.uk",
+    "url": "https://github.com/nmoynihan"
   },
-  "homepage": "https://pdf-junkie.invalid",
-  "desktopName": "pdf-junkie.desktop",
+  "homepage": "https://github.com/nmoynihan/margin-pdf",
+  "desktopName": "margin-pdf.desktop",
   "license": "MIT",
   "type": "module",
   "main": "./out/main/index.js",
@@ -21,8 +22,8 @@
     "dev": "npm run assets && electron-vite dev",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit",
-    "format": "prettier --write src scripts tests *.ts *.json *.yml .github/workflows/*.yml README.md",
-    "format:check": "prettier --check src scripts tests *.ts *.json *.yml .github/workflows/*.yml README.md",
+    "format": "prettier --write src scripts tests extensions/vscode extensions/chrome *.ts *.json *.yml .github/workflows/*.yml README.md AUDIT.md SECURITY.md CHANGELOG.md CONTRIBUTING.md",
+    "format:check": "prettier --check src scripts tests extensions/vscode extensions/chrome *.ts *.json *.yml .github/workflows/*.yml README.md AUDIT.md SECURITY.md CHANGELOG.md CONTRIBUTING.md",
     "build": "npm run assets && npm run typecheck && electron-vite build",
     "test": "vitest run",
     "test:e2e": "npm run build && node scripts/run-e2e.mjs",
@@ -30,7 +31,17 @@
     "dist": "npm run build && electron-builder --publish never",
     "dist:linux": "npm run build && electron-builder --linux --x64 --publish never",
     "dist:win": "npm run build && electron-builder --win --x64 --publish never",
-    "dist:mac": "npm run build && electron-builder --mac --x64 --arm64 --publish never"
+    "dist:mac": "npm run build && electron-builder --mac --x64 --arm64 --publish never",
+    "dist:release": "npm run build && electron-builder --config electron-builder.release.yml --publish never",
+    "dist:arch": "npm run build && electron-builder --linux pacman --x64 --publish never",
+    "test:arch-package": "node scripts/check-arch-package.mjs",
+    "build:vscode": "npm run assets && npm run typecheck && node scripts/build-vscode.mjs",
+    "dist:vscode": "npm run build:vscode && node scripts/package-vscode.mjs",
+    "test:vscode": "npm run build:vscode && node scripts/test-vscode.mjs",
+    "build:chrome": "npm run assets && npm run typecheck && node scripts/build-chrome.mjs",
+    "dist:chrome": "npm run build:chrome && node scripts/package-chrome.mjs && node scripts/chrome-store-assets.mjs",
+    "test:chrome": "npm run build:chrome && node scripts/test-chrome.mjs",
+    "check:release": "node scripts/check-release.mjs"
   },
   "dependencies": {
     "lucide-react": "1.63.0",
@@ -39,19 +50,32 @@
     "react-dom": "19.3.1"
   },
   "devDependencies": {
+    "@electron/fuses": "1.8.0",
     "@napi-rs/canvas": "1.0.13",
     "@playwright/test": "1.64.1",
     "@types/node": "26.6.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "@types/vscode": "^1.145.0",
     "@vitejs/plugin-react": "6.1.2",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.1.0",
     "electron": "45.1.0",
     "electron-builder": "26.18.0",
     "electron-vite": "6.0.0",
+    "esbuild": "^0.28.2",
     "pdf-lib": "1.17.1",
     "prettier": "3.9.10",
     "typescript": "7.0.2",
     "vite": "8.3.5",
-    "vitest": "5.0.5"
+    "vitest": "5.0.5",
+    "yazl": "^2.5.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nmoynihan/margin-pdf.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nmoynihan/margin-pdf/issues"
   }
 }

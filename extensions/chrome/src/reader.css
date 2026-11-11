@@ -1,0 +1,252 @@
+.browser-reader {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-width: 320px;
+}
+.browser-header {
+  height: 42px;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  z-index: 10;
+}
+.browser-header .app-wordmark {
+  flex-shrink: 0;
+  gap: 7px;
+  font-size: 14px;
+  letter-spacing: -0.4px;
+}
+.browser-header .brand-mark.small {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+}
+.browser-pane-tools {
+  flex: 1;
+  min-width: 0;
+}
+.browser-document-tools,
+.browser-header-actions {
+  flex-shrink: 0;
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+.browser-header .pane-toolbar,
+.browser-header .document-toolbar {
+  height: 32px;
+  min-height: 32px;
+  flex-wrap: nowrap;
+  padding: 0;
+  gap: 3px;
+  border: 0;
+  background: transparent;
+}
+.browser-header .pane-toolbar {
+  justify-content: flex-start;
+}
+.browser-header .document-heading,
+.browser-header .pane-toolbar-spacer,
+.browser-header .overflow-download {
+  display: none;
+}
+.browser-header .document-actions {
+  margin-left: 0;
+  gap: 3px;
+}
+.browser-header .pane-label {
+  margin-left: 6px;
+  white-space: nowrap;
+}
+.browser-reader .active-pane {
+  box-shadow: inset 0 2px var(--accent);
+}
+.browser-reader .active-pane .pdf-container {
+  border-top: 2px solid var(--accent);
+}
+.browser-main,
+.browser-main > .boundary-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+.browser-main .document-tab {
+  flex: 1;
+  min-height: 0;
+}
+.browser-footer {
+  min-height: 28px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 4px 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+}
+.browser-footer > span {
+  flex: 1;
+}
+.browser-reader a {
+  color: var(--accent);
+}
+.browser-welcome {
+  margin: auto;
+  text-align: center;
+  padding: 40px 20px;
+  overflow: auto;
+}
+.browser-welcome > .brand-mark {
+  margin: 0 auto 20px;
+}
+.browser-welcome h1 {
+  font-size: clamp(32px, 5vw, 52px);
+  font-weight: 550;
+  line-height: 1.12;
+  letter-spacing: -1.5px;
+  margin: 0 0 24px;
+}
+.browser-welcome p {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.7;
+  margin: 20px 0 28px;
+}
+.browser-welcome .text-button {
+  display: block;
+  margin: 10px auto;
+}
+.browser-welcome .browser-hint {
+  font-size: 12px;
+  margin-top: 32px;
+}
+.browser-settings {
+  width: min(470px, calc(100vw - 32px));
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+.browser-settings::backdrop {
+  background: #0006;
+}
+.browser-settings header,
+.browser-settings footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.browser-settings h2 {
+  margin: 0 0 16px;
+  font-size: 20px;
+}
+.browser-settings label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 16px 0;
+}
+.browser-settings select {
+  padding: 6px 10px;
+  min-width: 130px;
+}
+.browser-settings .check-setting {
+  justify-content: flex-start;
+  margin-top: 26px;
+}
+.browser-settings input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+.browser-settings p {
+  color: var(--muted);
+  line-height: 1.6;
+  font-size: 12px;
+}
+.browser-settings footer {
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+  margin-top: 20px;
+}
+.browser-print-progress {
+  position: fixed;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  background: var(--surface);
+  padding: 24px 36px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  text-align: center;
+  color: var(--ink);
+  margin: 0;
+}
+.browser-print-progress::backdrop {
+  background: #0006;
+}
+@media (max-width: 1000px) {
+  .browser-header .pane-history {
+    display: none;
+  }
+}
+@media (max-width: 800px) {
+  .browser-header {
+    gap: 4px;
+    padding-inline: 8px;
+  }
+  .browser-brand-name {
+    display: none;
+  }
+  .browser-header .toolbar-divider {
+    display: none;
+  }
+  .browser-header .icon-button {
+    width: 26px;
+    height: 28px;
+  }
+}
+@media (max-width: 650px) {
+  .browser-header .browser-download,
+  .browser-header .document-actions > button[aria-label='Reload PDF'],
+  .browser-header .rotation-button,
+  .browser-header .pane-label,
+  .browser-header .pane-toolbar button[aria-label='Close pane'] {
+    display: none;
+  }
+  .browser-header .overflow-download,
+  .browser-header .overflow-reload {
+    display: block;
+  }
+  .browser-header .page-control {
+    margin-right: 1px;
+    gap: 3px;
+  }
+  .browser-header .pane-toolbar select {
+    width: 78px;
+  }
+  .browser-footer > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+@media (max-width: 460px) {
+  .browser-header .pane-toolbar button[aria-label='Zoom in'],
+  .browser-header .pane-toolbar button[aria-label='Zoom out'] {
+    display: none;
+  }
+}

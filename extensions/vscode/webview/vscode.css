@@ -1,0 +1,43 @@
+body {
+  padding: 0;
+  --bg: var(--vscode-editor-background);
+  --surface: var(--vscode-editor-background);
+  --surface-alt: var(--vscode-sideBar-background);
+  --ink: var(--vscode-editor-foreground);
+  --muted: var(--vscode-descriptionForeground);
+  --subtle: var(--vscode-descriptionForeground);
+  --border: var(--vscode-panel-border, var(--vscode-contrastBorder, #8886));
+  --hover: var(--vscode-toolbar-hoverBackground);
+  --accent: var(--vscode-focusBorder);
+  --accent-soft: var(--vscode-list-inactiveSelectionBackground);
+  --paper-desk: var(--vscode-editor-background);
+  color: var(--ink);
+  background: var(--bg);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+}
+body.vscode-dark,
+body.vscode-high-contrast {
+  color-scheme: dark;
+}
+body.vscode-light,
+body.vscode-high-contrast-light {
+  color-scheme: light;
+}
+.vscode-reader {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.vscode-reader > .boundary-content {
+  flex: 1;
+}
+.sync-hint {
+  color: var(--muted);
+  line-height: 1.7;
+}
+body.vscode-high-contrast button,
+body.vscode-high-contrast-light button {
+  outline: 1px solid var(--vscode-contrastBorder);
+}

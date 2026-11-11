@@ -1,7 +1,37 @@
-import { emptySession, initialPosition, type SessionSnapshot, type ReadingPosition } from './types'
+import {
+  emptySession,
+  initialPosition,
+  skinIds,
+  defaultLayout,
+  type WorkspaceLayout,
+  type SessionSnapshot,
+  type ReadingPosition,
+} from './types'
 
 const finite = (value: unknown, fallback: number) =>
   typeof value === 'number' && Number.isFinite(value) ? value : fallback
+
+export function sanitizeLayout(input: unknown): WorkspaceLayout {
+  const defaults = defaultLayout()
+  const value = (input && typeof input === 'object' ? input : {}) as Partial<WorkspaceLayout>
+  return {
+    controls: ['top', 'left', 'bottom'].includes(value.controls ?? '')
+      ? value.controls!
+      : defaults.controls,
+    tabs: ['top', 'bottom', 'left', 'right'].includes(value.tabs ?? '')
+      ? value.tabs!
+      : defaults.tabs,
+    sidebar: ['left', 'right', 'overlay'].includes(value.sidebar ?? '')
+      ? value.sidebar!
+      : defaults.sidebar,
+    documentTools: ['top', 'bottom'].includes(value.documentTools ?? '')
+      ? value.documentTools!
+      : defaults.documentTools,
+    pageControls: ['top', 'bottom'].includes(value.pageControls ?? '')
+      ? value.pageControls!
+      : defaults.pageControls,
+  }
+}
 
 export function sanitizePosition(input: unknown): ReadingPosition {
   const p = (input ?? {}) as Partial<ReadingPosition>
@@ -49,6 +79,8 @@ export function sanitizeSession(input: unknown): SessionSnapshot {
     tabs: tabs.filter((t, i) => tabs.findIndex((other) => other.documentId === t.documentId) === i),
     activeDocumentId: typeof s.activeDocumentId === 'string' ? s.activeDocumentId : null,
     theme: ['system', 'light', 'dark'].includes(s.theme) ? s.theme : 'system',
+    skin: skinIds.includes(s.skin) ? s.skin : 'classic',
+    layout: sanitizeLayout(s.layout),
     sidebar: s.sidebar === 'thumbnails' ? 'thumbnails' : s.sidebar === null ? null : 'outline',
     rememberedTabs: sanitizeTabs(s.rememberedTabs),
   }
